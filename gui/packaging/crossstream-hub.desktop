@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=CrossStream Hub
+GenericName=Bonding telefonów
+Comment=Panel huba CrossStream: telefony, hotspot, serwer
+Exec=xs-hub-gui
+Icon=crossstream-hub
+Terminal=false
+Categories=Network;Settings;
+Keywords=crossstream;bonding;hotspot;LTE;5G;
+StartupWMClass=crossstream-hub

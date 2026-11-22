@@ -1,0 +1,160 @@
+# E2E environment (docs/testing.md), phase 04: three relays.
+#   internet 172.30.0.0/24: origin (nginx .10, also .41 and .42), iperf (.30), dns (.53), server (.2), carrierN (.1N)
+#   cellN    172.31.N.0/24: carrierN (.254, NAT + netem), relayN (.1N)
+#   cell4    172.31.4.0/24: carrier4 (.254), hub (.4): the hub's local uplink (phase 12)
+#   lan      10.43.0.0/24 : hub (.1, plays wlan0), relayN (.1N), client (.20)
+# Networks are plain bridges, not `internal`: Docker drops bridged packets
+# with an off-subnet source/destination on internal networks, which breaks the
+# carrier routers. Docker still isolates bridges from each other, so the
+# client reaches the origin only through hub -> relays -> carriers -> server
+# (run.sh checks that the hub cannot reach the origin directly).
+# Run: ./run.sh <scenario>
+name: xs-e2e
+
+x-node: &node
+  image: crossstream/xs-test:local
+  cap_add: [NET_ADMIN]
+  devices: [/dev/net/tun]
+
+services:
+  origin:
+    image: nginx:stable-alpine
+    # Three addresses: DIRECT mode is sticky per destination IP (fallback scenario).
+    # /generate_204 is the hub's captive portal probe; :8080 plays a hotel
+    # login page (302 to /login) for the captive scenario (phase 19).
+    command: ["sh", "-c", "ip addr add 172.30.0.41/24 dev eth0 && ip addr add 172.30.0.42/24 dev eth0 && echo 'server { listen 80 default_server; location = /generate_204 { return 204; } location / { root /usr/share/nginx/html; } } server { listen 8080; location = /login { return 200 hotel-login; } location / { return 302 http://172.30.0.42:8080/login; } }' >/etc/nginx/conf.d/default.conf && dd if=/dev/urandom of=/usr/share/nginx/html/big.bin bs=1M count=200 2>/dev/null && exec nginx -g 'daemon off;'"]
+    cap_add: [NET_ADMIN]
+    networks:
+      internet: { ipv4_address: 172.30.0.10 }
+
+  iperf:
+    <<: *node
+    command: ["iperf3", "-s"]
+    networks:
+      internet: { ipv4_address: 172.30.0.30 }
+
+  # DNS on the "internet" for the hub forwarder (bypass scenario): bypass.test
+  # resolves to origin .41, tunnel.test and the DoH canary to origin .42 (the
+  # hub answers the canary NXDOMAIN itself while its bypass list is not empty).
+  dns:
+    <<: *node
+    command: ["dnsmasq", "-k", "--no-resolv", "--no-hosts", "--address=/bypass.test/172.30.0.41",
+      "--address=/tunnel.test/172.30.0.42", "--address=/use-application-dns.net/172.30.0.42", "--log-queries", "--log-facility=-"]
+    networks:
+      internet: { ipv4_address: 172.30.0.53 }
+
+  server:
+    <<: *node
+    build:
+      context: ..
+      dockerfile: testenv/Dockerfile
+      target: node
+      args:
+        RACE: ${RACE:-0} # run.sh RACE=1: race-detector binaries
+    command: ["xs-server", "-config", "/data/server.yaml"]
+    environment:
+      XS_SERVER_PUBLIC_ENDPOINTS: 172.30.0.2
+      XS_SERVER_EGRESS_ALLOW: 172.30.0.0/24 # the simulated internet is a private range
+      # Web panel on every address, as in bridge-mode compose ("webui" checks tunnel clients get 403).
+      XS_SERVER_WEB_LISTEN: 0.0.0.0:8443
+      XS_SERVER_WEB_ALLOW_PUBLIC: "true"
+    sysctls:
+      net.ipv4.ip_forward: "1"
+    volumes: [server-data:/data] # survives stop/start (fallback); run.sh removes it with down -v
+    networks:
+      internet: { ipv4_address: 172.30.0.2 }
+
+  carrier1:
+    <<: *node
+    command: ["xs-carrier"]
+    sysctls:
+      net.ipv4.ip_forward: "1"
+    networks:
+      internet: { ipv4_address: 172.30.0.11 }
+      cell1: { ipv4_address: 172.31.1.254 }
+
+  relay1:
+    <<: *node
+    command: ["sh", "-c", "ip route replace default via 172.31.1.254 && exec sleep infinity"]
+    networks:
+      lan: { ipv4_address: 10.43.0.11 }
+      cell1: { ipv4_address: 172.31.1.11 }
+
+  carrier2:
+    <<: *node
+    command: ["xs-carrier"]
+    sysctls:
+      net.ipv4.ip_forward: "1"
+    networks:
+      internet: { ipv4_address: 172.30.0.12 }
+      cell2: { ipv4_address: 172.31.2.254 }
+
+  relay2:
+    <<: *node
+    command: ["sh", "-c", "ip route replace default via 172.31.2.254 && exec sleep infinity"]
+    networks:
+      lan: { ipv4_address: 10.43.0.12 }
+      cell2: { ipv4_address: 172.31.2.12 }
+
+  carrier3:
+    <<: *node
+    command: ["xs-carrier"]
+    sysctls:
+      net.ipv4.ip_forward: "1"
+    networks:
+      internet: { ipv4_address: 172.30.0.13 }
+      cell3: { ipv4_address: 172.31.3.254 }
+
+  relay3:
+    <<: *node
+    command: ["sh", "-c", "ip route replace default via 172.31.3.254 && exec sleep infinity"]
+    networks:
+      lan: { ipv4_address: 10.43.0.13 }
+      cell3: { ipv4_address: 172.31.3.13 }
+
+  # carrier4: the hub's own local uplink (USB tethering / modem stand-in, phase 12).
+  carrier4:
+    <<: *node
+    command: ["xs-carrier"]
+    sysctls:
+      net.ipv4.ip_forward: "1"
+    networks:
+      internet: { ipv4_address: 172.30.0.14 }
+      cell4: { ipv4_address: 172.31.4.254 }
+
+  hub:
+    <<: *node
+    # Docker's default route (via its cell4 bridge gateway) is replaced by
+    # carrier4: the hub then has internet of its own, like a laptop with a
+    # USB-tethered phone.
+    command: ["sh", "-c", "ip route del default; ip route add default via 172.31.4.254 dev $$(xs-iface 172.31.4.) metric 500 && exec xs-hubd -headless -lan-iface $$(xs-iface 10.43.0.) -dns -dns-upstream 172.30.0.53 -captive-url http://172.30.0.10/generate_204 -dir /var/lib/crossstream >/var/log/xs-hubd.log 2>&1"]
+    sysctls:
+      net.ipv4.ip_forward: "1"
+      net.ipv4.conf.all.rp_filter: "0"
+      net.ipv4.conf.default.rp_filter: "0"
+    networks:
+      lan: { ipv4_address: 10.43.0.1 }
+      cell4: { ipv4_address: 172.31.4.4 } # local uplink (phase 12), disabled until a scenario enables it
+
+  client:
+    <<: *node
+    command: ["sh", "-c", "ip route replace default via 10.43.0.1 && exec sleep infinity"]
+    networks:
+      lan: { ipv4_address: 10.43.0.20 }
+
+volumes:
+  server-data:
+
+networks:
+  internet:
+    ipam: { config: [{ subnet: 172.30.0.0/24, gateway: 172.30.0.1 }] }
+  cell1:
+    ipam: { config: [{ subnet: 172.31.1.0/24, gateway: 172.31.1.1 }] }
+  cell2:
+    ipam: { config: [{ subnet: 172.31.2.0/24, gateway: 172.31.2.1 }] }
+  cell3:
+    ipam: { config: [{ subnet: 172.31.3.0/24, gateway: 172.31.3.1 }] }
+  cell4:
+    ipam: { config: [{ subnet: 172.31.4.0/24, gateway: 172.31.4.1 }] }
+  lan:
+    ipam: { config: [{ subnet: 10.43.0.0/24, gateway: 10.43.0.254 }] }

@@ -1,0 +1,33 @@
+configuration:
+  public_endpoints:
+    name: Adresy publiczne
+    description: >-
+      Adresy wpisywane do kodów rejestracji: publiczny adres IP lub nazwa DNS, opcjonalnie z
+      portem (np. vpn.example.org albo 203.0.113.5:51900). Puste = wykrywane automatycznie.
+  pep:
+    name: Performance Enhancing Proxy
+    description: Przyjmuj strumienie split-TCP od hubów (szybsze pobieranie na stratnych łączach komórkowych).
+  log_level:
+    name: Poziom logów
+    description: Szczegółowość logu aplikacji.
+  min_hub_version:
+    name: Minimalna wersja huba
+    description: Odrzucaj huby starsze niż ta wersja (vX.Y.Z). Puste = dowolna wersja.
+  egress_allow:
+    name: Dozwolone sieci prywatne
+    description: >-
+      Sieci prywatne, do których huby mogą sięgać przez tunel (np. 192.168.88.0/24).
+      Domyślnie huby mają dostęp tylko do internetu, nigdy do sieci domowej.
+  port_443:
+    name: Używaj portu 443
+    description: >-
+      Nasłuchuj też na UDP 443 i WSS 443 i wpisuj je do kodów rejestracji (zapas dla sieci,
+      które blokują 51900). Najpierw zmapuj 443/udp i 443/tcp w sekcji Sieć.
+network:
+  51900/udp: >-
+    Port tunelu (UDP, główny transport). Trzymaj UDP i TCP na tym samym porcie i przekieruj
+    go na routerze. Zmiana po rejestracji hubów: każdy hub trzeba zarejestrować ponownie (nowy kod).
+  51900/tcp: Port tunelu (TCP, dla sieci blokujących UDP). Ten sam port co 51900/udp.
+  443/udp: Tunel (UDP na 443)
+  443/tcp: Tunel (WSS na 443, wygląda jak HTTPS)
+  9100/tcp: Metryki Prometheus (/metrics, dla zewnętrznych scraperów)

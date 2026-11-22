@@ -1,0 +1,14 @@
+# Linux servers: host networking, no Docker NAT or userland proxy in the data
+# path. xs-server's nft rules then live in the host namespace; it only ever
+# touches its own "crossstream" table. Enable forwarding on the host:
+#   sysctl -w net.ipv4.ip_forward=1
+# Usage: docker compose -f docker-compose.yml -f docker-compose.host.yml up -d
+services:
+  server:
+    network_mode: host
+    ports: !reset []
+    sysctls: !reset {}
+    environment:
+      # The web panel binds loopback on the host; remote access through an SSH tunnel.
+      XS_SERVER_WEB_LISTEN: ${XS_SERVER_WEB_LISTEN:-127.0.0.1:8443}
+      XS_SERVER_WEB_ALLOW_PUBLIC: "false"

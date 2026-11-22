@@ -1,0 +1,4 @@
+#!/bin/sh
+# xs-iface <ipv4 prefix>: print the interface whose IPv4 address starts with
+# the prefix (Docker does not promise eth0/eth1 order across networks).
+ip -o -4 addr show | awk -v p="$1" 'index($4, p) == 1 { print $2; exit }'

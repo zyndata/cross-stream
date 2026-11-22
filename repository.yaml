@@ -1,0 +1,5 @@
+# Home Assistant app repository (copied to the root of the public repo by
+# deploy/public/export.sh). Add it in Settings → Apps → App store → ⋮ → Repositories.
+name: CrossStream
+url: https://github.com/zyndata/cross-stream
+maintainer: zyndata

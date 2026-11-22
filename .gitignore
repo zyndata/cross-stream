@@ -1,0 +1,33 @@
+
+# Build outputs
+bin/
+!testenv/bin/
+testenv/out/
+testenv/out.*/
+testenv/field/out/
+android/**/build/
+android/.gradle/
+android/app/libs/*.aar
+gui/build/*
+!gui/build/appicon.png
+gui/frontend/node_modules/
+gui/frontend/dist/*
+!gui/frontend/dist/.gitkeep
+gui/frontend/wailsjs/
+webui/node_modules/
+webui/dist/*
+!webui/dist/.gitkeep
+deploy/server/data/
+
+# Secrets and local settings
+*.key
+.env*
+.claude/settings.local.json
+android/app/libs/*.jar
+android/local.properties
+android/keystore/
+*.jks
+*.keystore
+android/.idea/
+android/.kotlin/
+gui/frontend/package.json.md5

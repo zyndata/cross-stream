@@ -1,0 +1,49 @@
+# xs-server configuration. Copy to data/server.yaml (mounted as /data/server.yaml).
+# A missing file means these defaults. Every key can be overridden with an
+# environment variable XS_SERVER_<KEY>, e.g. XS_SERVER_LISTEN_PORTS=51900,443.
+
+# Bind address for the UDP ports ("" = all addresses).
+listen_address: ""
+# UDP ports; all share one session table. 443 helps on carriers that block odd ports.
+listen_ports: [51900, 443]
+# Stream transports for carriers that block UDP (env value "none" = off):
+# framed TCP, and WebSocket over TLS (self-signed tls.crt/tls.key, created in
+# data_dir on first start; hubs do not check it, Noise authenticates the server).
+tcp_ports: [51900]
+wss_ports: [443]
+wss_path: /xs
+# Endpoints written into enrollment codes. Entries: bare host (one udp:// endpoint
+# per listen port, then tcp:// and wss:// for the stream ports), host:port, or a full URL. Empty = auto-detect the outbound
+# address, which is wrong behind NAT and on Docker Desktop: set your public
+# address or DNS name here (or XS_SERVER_PUBLIC_ENDPOINTS).
+public_endpoints: []
+# Port hubs dial for the main tunnel port (the first listen port, UDP and TCP) when
+# the router maps another public port to it. 0 = the listen port. The panel and
+# "xs-ctl tunnel-port" change it here (applied at restart). Changing it after hubs
+# are enrolled means enrolling them again (their codes carry the old port).
+public_port: 0
+# Where public_port is kept: "" = this file; "supervisor" = the Home Assistant
+# app's Network section (set by the app, ha/crossstream_server/run.sh).
+port_source: ""
+# state.json (enrolled hubs, hashed tokens) and server.key live here.
+data_dir: /data
+# Lifetime of an enrollment code.
+token_ttl: 24h
+# Unix socket used by xs-ctl.
+control_socket: /run/xs-server.sock
+tun_name: xss0
+# Tunnel MTU sent to hubs.
+mtu: 1360
+# debug | info | warn | error
+log_level: info
+# Accept PEP (split TCP) streams from hubs: the server dials the origins itself
+# (BBR when the kernel has tcp_bbr). Hubs use it only when their own setting is on.
+pep: true
+# Egress filter exceptions (phase 14): private IPv4 prefixes hubs may still reach.
+# Without them the tunnel cannot reach 10/8, 172.16/12, 192.168/16 and 169.254/16;
+# TCP 25/445, UDP 67/68/445 and the Docker API stay blocked in any case.
+egress_allow: []
+# Refuse hubs whose software is older than this (vX.Y.Z); empty = any version.
+min_hub_version: ""
+# Prometheus /metrics on a loopback or private ip:port (e.g. 127.0.0.1:9100); empty = off.
+metrics_listen: ""

@@ -1,0 +1,14 @@
+// CrossStream hub (installed by deploy/hub/install.sh): members of group
+// crossstream may start, stop and restart xs-hubd.service without a
+// password, so the hub GUI can start the hub and stop it on close.
+// Nothing else is allowed.
+polkit.addRule(function (action, subject) {
+	if (action.id == "org.freedesktop.systemd1.manage-units" &&
+		action.lookup("unit") == "xs-hubd.service" &&
+		subject.isInGroup("crossstream")) {
+		var verb = action.lookup("verb");
+		if (verb == "start" || verb == "stop" || verb == "restart") {
+			return polkit.Result.YES;
+		}
+	}
+});

@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <!-- CrossStream mark: three links (teal, white, orange) flow into one bonded stream.
+       Master for every icon: android/app/src/main/res/drawable/ic_launcher_*.xml and
+       ic_relay.xml use the same paths; the PNGs (gui/packaging, gui/build/appicon.png,
+       ha/crossstream_server) are renders of this file. -->
+  <rect x="8" y="8" width="240" height="240" rx="52" fill="#13315c"/>
+  <g fill="none" stroke-linecap="round" stroke-width="18">
+    <path d="M40 72 C 110 72, 120 128, 176 128" stroke="#5fd3bc"/>
+    <path d="M40 128 L 176 128" stroke="#ffffff"/>
+    <path d="M40 184 C 110 184, 120 128, 176 128" stroke="#f4a259"/>
+  </g>
+  <path d="M168 128 L 216 128" stroke="#ffffff" stroke-width="30" stroke-linecap="round"/>
+</svg>

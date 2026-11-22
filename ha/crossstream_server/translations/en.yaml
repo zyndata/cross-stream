@@ -1,0 +1,33 @@
+configuration:
+  public_endpoints:
+    name: Public endpoints
+    description: >-
+      Addresses put into enrollment codes: your public IP or DNS name, optionally with a
+      port (e.g. vpn.example.org or 203.0.113.5:51900). Empty = detected automatically.
+  pep:
+    name: Performance Enhancing Proxy
+    description: Accept split-TCP streams from hubs (faster downloads over lossy cellular links).
+  log_level:
+    name: Log level
+    description: Detail of the app log.
+  min_hub_version:
+    name: Minimum hub version
+    description: Refuse hubs older than this version (vX.Y.Z). Empty = any version.
+  egress_allow:
+    name: Allowed private networks
+    description: >-
+      Private networks hubs may still reach through the tunnel (e.g. 192.168.88.0/24).
+      By default hubs reach the internet only, never your home network.
+  port_443:
+    name: Use port 443
+    description: >-
+      Also listen on UDP 443 and WSS 443 and put them into enrollment codes (fallbacks for
+      networks that block 51900). Map 443/udp and 443/tcp in the Network section first.
+network:
+  51900/udp: >-
+    Tunnel port (UDP, main transport). Keep UDP and TCP on the same port and forward it on
+    your router. Changing it after hubs are enrolled: each hub must enroll again (new code).
+  51900/tcp: Tunnel port (TCP, for networks that block UDP). Same port as 51900/udp.
+  443/udp: Tunnel (UDP on 443)
+  443/tcp: Tunnel (WSS on 443, looks like HTTPS)
+  9100/tcp: Prometheus metrics (/metrics, for external scrapers)

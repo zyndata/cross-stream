@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Home -->
+    <string name="settings">Ustawienia</string>
+    <string name="toggle_label">Udostępniaj dane</string>
+    <string name="status_off">Udostępnianie wyłączone</string>
+    <string name="shared_totals">Udostępniono w tej sesji %1$s · łącznie %2$s</string>
+    <string name="limit_line">Limit: %1$s z %2$s (%3$s)</string>
+    <string name="hubs">Huby</string>
+    <string name="add_hub">+ Dodaj hub</string>
+    <string name="refresh_hubs">Odśwież</string>
+    <string name="refreshing_hubs">Szukam…</string>
+    <string name="no_hub">Brak huba: dotknij „Dodaj hub” i zeskanuj kod QR pokazany przez hub.</string>
+    <string name="hub_connected">Połączony</string>
+    <string name="hub_in_range">W zasięgu</string>
+    <string name="hub_away">Poza zasięgiem</string>
+    <string name="hub_connecting">Łączenie…</string>
+    <string name="hub_range_unknown">Zasięg nieznany</string>
+    <string name="hub_shared">Udostępniono %1$s</string>
+    <string name="theme">Motyw</string>
+    <string name="theme_system">Jak w systemie</string>
+    <string name="theme_light">Jasny</string>
+    <string name="theme_dark">Ciemny</string>
+    <string name="hub_use">Jak ten hub może używać moich danych</string>
+    <string name="hub_use_normal">Normalnie</string>
+    <string name="hub_use_needed">Tylko gdy trzeba</string>
+    <string name="hub_use_backup">Tylko jako zapas</string>
+    <string name="hub_use_hint">Właściciel huba nie może wybrać więcej. Działa od razu.</string>
+    <string name="stats_last_stop">Ostatnie zatrzymanie: %1$s</string>
+
+    <!-- Setup -->
+    <string name="setup_title">Dokończ konfigurację</string>
+    <string name="setup_permissions">Zezwól na powiadomienia (tam jest przycisk Stop) i dostęp do pobliskich sieci Wi-Fi (żeby znaleźć huby).</string>
+    <string name="setup_grant">Zezwól</string>
+    <string name="setup_battery">Pozwól aplikacji działać w tle bez ograniczeń baterii, inaczej Android może przerwać udostępnianie przy wygaszonym ekranie.</string>
+    <string name="setup_battery_button">Ustawienia baterii</string>
+    <string name="hint_xiaomi">Xiaomi: włącz też Autostart dla tej aplikacji (Informacje o aplikacji → Autostart) i ustaw Oszczędzanie baterii na „Bez ograniczeń”.</string>
+    <string name="hint_samsung">Samsung: dodaj tę aplikację do „Aplikacje nigdy nieusypiane” (Ustawienia → Bateria → Limity użycia w tle).</string>
+    <string name="hint_huawei">Huawei / Honor: w Uruchamianiu aplikacji ustaw „Zarządzaj ręcznie” i zezwól na działanie w tle.</string>
+
+    <!-- Hub detail -->
+    <string name="back">← Wstecz</string>
+    <string name="hub_wifi">Wi-Fi: %1$s</string>
+    <string name="hub_last_seen">Ostatnie połączenie: %1$s</string>
+    <string name="never">nigdy</string>
+    <string name="forget">Zapomnij hub</string>
+    <string name="forget_title">Zapomnieć %1$s?</string>
+    <string name="forget_text">Telefon usunie hub i jego klucz parowania. Aby znów udostępniać, zeskanuj ponownie jego kod QR.</string>
+
+    <!-- Settings -->
+    <string name="data_limit">Limit danych</string>
+    <string name="limit_custom">Własny</string>
+    <string name="limit_unlimited">Bez limitu</string>
+    <string name="limit_custom_mb">Limit w MB</string>
+    <string name="period">Okres</string>
+    <string name="period_session">na sesję</string>
+    <string name="period_day">na dzień</string>
+    <string name="period_month">na miesiąc</string>
+    <string name="reset_day">Miesiąc zaczyna się dnia (1–28)</string>
+    <string name="daily_hint">Wskazówka: limit dzienny ok. 10 %% miesięcznego (%1$s) rozkłada pakiet na cały miesiąc.</string>
+    <string name="daily_use">Ustaw %1$s dziennie</string>
+    <string name="over_limit">Po osiągnięciu limitu</string>
+    <string name="over_stop">Zatrzymaj udostępnianie</string>
+    <string name="over_throttle">Zwolnij do %1$d kb/s</string>
+    <string name="used_this_period">Zużyto w tym okresie: %1$s</string>
+    <string name="reset_counter">Wyzeruj licznik</string>
+    <string name="battery">Bateria</string>
+    <string name="battery_off">Próg baterii: wyłączony</string>
+    <string name="battery_min">Zatrzymaj poniżej %1$d %%</string>
+    <string name="battery_charging">Zatrzymuj także podczas ładowania</string>
+    <string name="language">Język</string>
+    <string name="lang_system">Domyślny systemu</string>
+    <string name="background">Działanie w tle</string>
+    <string name="battery_opt_off">Optymalizacja baterii jest wyłączona dla tej aplikacji.</string>
+    <string name="battery_opt_on">Optymalizacja baterii jest włączona: Android może przerwać udostępnianie w tle.</string>
+    <string name="app_settings">Informacje o aplikacji</string>
+    <string name="hint_overlay">Jeśli okno zgody na Wi-Fi nie reaguje na dotyk, zamknij aplikacje filtrujące ekran (tryb nocny, filtry światła niebieskiego, np. Twilight, Lux) i spróbuj ponownie.</string>
+    <string name="logs">Logi</string>
+    <string name="share_logs">Udostępnij logi</string>
+
+    <!-- QR scan -->
+    <string name="scan_hint">Skieruj aparat na kod QR huba.</string>
+    <string name="qr_invalid">To nie jest kod huba CrossStream.</string>
+    <string name="camera_denied">Do skanowania kodu potrzebny jest dostęp do aparatu.</string>
+    <string name="cancel">Anuluj</string>
+
+    <!-- Notification and status -->
+    <string name="stop">Stop</string>
+    <string name="channel_name">Udostępnianie</string>
+    <string name="notif_relaying">Udostępniam dla %1$s</string>
+    <string name="notif_connecting">Łączenie z %1$s…</string>
+    <string name="notif_searching">Szukam Twoich hubów…</string>
+    <string name="notif_paused">Wstrzymano: %1$s</string>
+    <string name="notif_shared">Udostępniono %1$s w tej sesji</string>
+    <string name="notif_stopped">Udostępnianie wyłączone: %1$s</string>
+    <string name="notif_stopped_text">Włącz je ponownie w aplikacji, gdy zechcesz udostępniać.</string>
+    <string name="reason_limit">osiągnięto limit danych</string>
+    <string name="reason_battery">niski poziom baterii</string>
+    <string name="reason_no_data">brak danych komórkowych</string>
+    <string name="reason_other">zatrzymano</string>
+    <string name="ok">OK</string>
+    <string name="hub_choose">Wybierz ten hub</string>
+    <string name="hub_choose_auto">Wybieraj automatycznie</string>
+    <string name="hub_chosen_text">Wybrany: telefon łączy się z tym hubem zawsze, gdy jest dostępny, także zamiast innego huba.</string>
+    <string name="hub_name_chosen">%1$s · wybrany</string>
+    <string name="hub_use_normal_info">Normalnie — hub używa tego telefonu na równi z pozostałymi łączami, kiedy tylko ma ruch.</string>
+    <string name="hub_use_needed_info">Tylko gdy trzeba — telefon dołącza dopiero wtedy, gdy pozostałe łącza są w pełni zajęte (właściciel huba może też ustawić próg prędkości). Zwykle zużywa mniej danych.</string>
+    <string name="hub_use_backup_info">Tylko jako zapas — telefon nie przesyła danych, dopóki działa jakiekolwiek inne łącze; przejmuje ruch dopiero, gdy wszystkie inne padną.</string>
+    <string name="range_hint">Telefon nie widzi, które huby są w zasięgu: Android pokazuje listę sieci Wi-Fi tylko aplikacjom z dostępem do lokalizacji. Aplikacja nie zapisuje ani nie wysyła położenia. Bez tego łączy się z wybranym albo ostatnio używanym hubem.</string>
+    <string name="range_allow">Pozwól na lokalizację</string>
+    <string name="range_location_on">Włącz lokalizację w telefonie</string>
+    <string name="refresh_throttled">Android chwilowo nie pozwala skanować (najwyżej 4 razy na 2 minuty) — pokazuję wynik ostatniego skanu.</string>
+    <string name="status_wifi_off">Wi-Fi jest wyłączone — włącz je, aby udostępniać dane</string>
+    <string name="updates">Aktualizacje</string>
+    <string name="update_available">Dostępna wersja %1$s</string>
+    <string name="update_download">Pobierz (%1$d MB)</string>
+    <string name="update_downloading">Pobieranie…</string>
+    <string name="update_install">Zainstaluj</string>
+    <string name="update_failed">Nie udało się pobrać aktualizacji</string>
+    <string name="update_allow_install">Pozwól aplikacji CrossStream Relay instalować aplikacje, potem dotknij „Zainstaluj” jeszcze raz.</string>
+    <string name="update_whats_new">Co nowego</string>
+    <string name="update_hide">Ukryj</string>
+    <string name="update_version">Zainstalowana wersja: %1$s</string>
+    <string name="update_dev_build">Wersja deweloperska: nie jest aktualizowana z wydań.</string>
+    <string name="update_auto">Sprawdzaj aktualizacje przy otwarciu aplikacji</string>
+    <string name="update_hint">Sprawdzenie to jedno małe zapytanie do GitHuba (kilka KB), bez żadnych danych o Tobie ani o hubach. APK pobiera się dopiero po dotknięciu „Pobierz”.</string>
+    <string name="update_check_now">Sprawdź teraz</string>
+    <string name="update_checking">Sprawdzam…</string>
+    <string name="update_up_to_date">Masz najnowszą wersję (wydanie %1$s)</string>
+    <string name="update_latest">Najnowsze wydanie: %1$s</string>
+    <string name="update_unreachable">Nie udało się połączyć z GitHubem — spróbuj później.</string>
+</resources>

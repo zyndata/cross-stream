@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name" translatable="false">CrossStream Relay</string>
+
+    <!-- Home -->
+    <string name="settings">Settings</string>
+    <string name="toggle_label">Share data</string>
+    <string name="status_off">Not sharing</string>
+    <string name="shared_totals">Shared this session %1$s · all time %2$s</string>
+    <string name="limit_line">Limit: %1$s of %2$s (%3$s)</string>
+    <string name="hubs">Hubs</string>
+    <string name="add_hub">+ Add hub</string>
+    <string name="refresh_hubs">Refresh</string>
+    <string name="refreshing_hubs">Scanning…</string>
+    <string name="no_hub">No hub yet: tap “Add hub” and scan the QR code shown by the hub.</string>
+    <string name="hub_connected">Connected</string>
+    <string name="hub_in_range">In range</string>
+    <string name="hub_away">Away</string>
+    <string name="hub_connecting">Connecting…</string>
+    <string name="hub_range_unknown">Range unknown</string>
+    <string name="hub_shared">Shared %1$s</string>
+    <string name="theme">Theme</string>
+    <string name="theme_system">System default</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+    <string name="hub_use">How can this hub use my data</string>
+    <string name="hub_use_normal">Normal</string>
+    <string name="hub_use_needed">Only when needed</string>
+    <string name="hub_use_backup">Only as backup</string>
+    <string name="hub_use_hint">The hub owner cannot choose more than this. Applies right away.</string>
+    <string name="stats_last_stop">Last stop: %1$s</string>
+
+    <!-- Setup -->
+    <string name="setup_title">Finish setup</string>
+    <string name="setup_permissions">Allow notifications (the Stop button lives there) and nearby Wi-Fi access (to find your hubs).</string>
+    <string name="setup_grant">Allow</string>
+    <string name="setup_battery">Let the app run in the background without battery restrictions, or Android may stop sharing with the screen off.</string>
+    <string name="setup_battery_button">Battery settings</string>
+    <string name="hint_xiaomi">Xiaomi: also turn on Autostart for this app (App info → Autostart) and set Battery saver to “No restrictions”.</string>
+    <string name="hint_samsung">Samsung: add this app to “Never sleeping apps” (Settings → Battery → Background usage limits).</string>
+    <string name="hint_huawei">Huawei / Honor: set this app to “Manage manually” in App launch and allow running in the background.</string>
+
+    <!-- Hub detail -->
+    <string name="back">← Back</string>
+    <string name="hub_wifi">Wi-Fi: %1$s</string>
+    <string name="hub_last_seen">Last connected: %1$s</string>
+    <string name="never">never</string>
+    <string name="forget">Forget hub</string>
+    <string name="forget_title">Forget %1$s?</string>
+    <string name="forget_text">This phone deletes the hub and its pairing key. To share with it again, scan its QR code again.</string>
+
+    <!-- Settings -->
+    <string name="data_limit">Data limit</string>
+    <string name="limit_custom">Custom</string>
+    <string name="limit_unlimited">Unlimited</string>
+    <string name="limit_custom_mb">Limit in MB</string>
+    <string name="period">Period</string>
+    <string name="period_session">per session</string>
+    <string name="period_day">per day</string>
+    <string name="period_month">per month</string>
+    <string name="reset_day">Month starts on day (1–28)</string>
+    <string name="daily_hint">Tip: a daily limit of about 10 %% of the monthly one (%1$s) spreads your plan over the month.</string>
+    <string name="daily_use">Use %1$s per day</string>
+    <string name="over_limit">When the limit is reached</string>
+    <string name="over_stop">Stop sharing</string>
+    <string name="over_throttle">Slow down to %1$d kb/s</string>
+    <string name="used_this_period">Used this period: %1$s</string>
+    <string name="reset_counter">Reset counter</string>
+    <string name="battery">Battery</string>
+    <string name="battery_off">Battery threshold: off</string>
+    <string name="battery_min">Stop sharing below %1$d %%</string>
+    <string name="battery_charging">Stop also while charging</string>
+    <string name="language">Language</string>
+    <string name="lang_system">System default</string>
+    <string name="lang_en" translatable="false">English</string>
+    <string name="lang_pl" translatable="false">Polski</string>
+    <string name="background">Background operation</string>
+    <string name="battery_opt_off">Battery optimisation is off for this app.</string>
+    <string name="battery_opt_on">Battery optimisation is on: Android may stop sharing in the background.</string>
+    <string name="app_settings">App info</string>
+    <string name="hint_overlay">If the Wi-Fi approval dialog does not react to taps, close screen filter apps (night mode, blue-light filters such as Twilight or Lux) and try again.</string>
+    <string name="logs">Logs</string>
+    <string name="share_logs">Share logs</string>
+
+    <!-- QR scan -->
+    <string name="scan_hint">Point the camera at the hub\'s QR code.</string>
+    <string name="qr_invalid">This is not a CrossStream hub code.</string>
+    <string name="camera_denied">Camera permission is needed to scan the code.</string>
+    <string name="cancel">Cancel</string>
+
+    <!-- Notification and status -->
+    <string name="stop">Stop</string>
+    <string name="channel_name">Relaying</string>
+    <string name="notif_relaying">Sharing with %1$s</string>
+    <string name="notif_connecting">Connecting to %1$s…</string>
+    <string name="notif_searching">Looking for your hubs…</string>
+    <string name="notif_paused">Paused: %1$s</string>
+    <string name="notif_shared">Shared %1$s this session</string>
+    <string name="notif_stopped">Sharing off: %1$s</string>
+    <string name="notif_stopped_text">Turn it on again in the app when you want to share.</string>
+    <string name="reason_limit">data limit reached</string>
+    <string name="reason_battery">battery low</string>
+    <string name="reason_no_data">no mobile data</string>
+    <string name="reason_other">stopped</string>
+    <string name="ok">OK</string>
+    <string name="hub_choose">Choose this hub</string>
+    <string name="hub_choose_auto">Choose automatically</string>
+    <string name="hub_chosen_text">Chosen: this phone joins this hub whenever it is available, also instead of another hub.</string>
+    <string name="hub_name_chosen">%1$s · chosen</string>
+    <string name="hub_use_normal_info">Normal — the hub uses this phone like its other links whenever it has traffic.</string>
+    <string name="hub_use_needed_info">Only when needed — this phone joins in only when the other links are fully loaded (the hub owner can also set a speed threshold). Usually uses less data.</string>
+    <string name="hub_use_backup_info">Only as backup — this phone carries no data while any other link works; it takes over only when all others fail.</string>
+    <string name="range_hint">This phone cannot tell which hubs are in range: Android shows the list of Wi-Fi networks only to apps with location access. The app never stores or sends your location. Without it, it joins the chosen or last used hub.</string>
+    <string name="range_allow">Allow location</string>
+    <string name="range_location_on">Turn on location</string>
+    <string name="refresh_throttled">Android does not allow a scan right now (at most 4 per 2 minutes) — showing the last scan.</string>
+    <string name="status_wifi_off">Wi-Fi is off — turn it on to share data</string>
+    <string name="updates">Updates</string>
+    <string name="update_available">Version %1$s is available</string>
+    <string name="update_download">Download (%1$d MB)</string>
+    <string name="update_downloading">Downloading…</string>
+    <string name="update_install">Install</string>
+    <string name="update_failed">Could not download the update</string>
+    <string name="update_allow_install">Allow CrossStream Relay to install apps, then tap Install again.</string>
+    <string name="update_whats_new">What\'s new</string>
+    <string name="update_hide">Hide</string>
+    <string name="update_version">Installed version: %1$s</string>
+    <string name="update_dev_build">Development build: it is not updated from releases.</string>
+    <string name="update_auto">Check for updates when the app opens</string>
+    <string name="update_hint">A check is one small request to GitHub (a few KB) with nothing about you or your hubs. The APK downloads only when you tap Download.</string>
+    <string name="update_check_now">Check now</string>
+    <string name="update_checking">Checking…</string>
+    <string name="update_up_to_date">Up to date (latest release: %1$s)</string>
+    <string name="update_latest">Latest release: %1$s</string>
+    <string name="update_unreachable">Could not reach GitHub — try again later.</string>
+</resources>

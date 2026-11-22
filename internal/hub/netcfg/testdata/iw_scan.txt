@@ -1,0 +1,150 @@
+BSS 3c:84:6a:11:22:33(on wlan9) -- associated
+	last seen: 1203.456s [boottime]
+	TSF: 12345670 usec (0d, 00:02:03)
+	freq: 5745.0
+	beacon interval: 100 TUs
+	capability: ESS Privacy ShortSlotTime (0x0411)
+	signal: -48.00 dBm
+	last seen: 120 ms ago
+	Information elements from Probe Response frame:
+	SSID: Neighbour-5G
+	Supported rates: 6.0* 9.0 12.0* 18.0 24.0* 36.0 48.0 54.0 
+	DS Parameter set: channel 149
+	HT operation:
+		 * primary channel: 149
+		 * secondary channel offset: no secondary
+BSS 3c:84:6a:11:22:34(on wlan9)
+	last seen: 1204.456s [boottime]
+	TSF: 12345671 usec (0d, 00:02:03)
+	freq: 5745.0
+	beacon interval: 100 TUs
+	capability: ESS Privacy ShortSlotTime (0x0411)
+	signal: -70.00 dBm
+	last seen: 121 ms ago
+	Information elements from Probe Response frame:
+	SSID: Office
+	Supported rates: 6.0* 9.0 12.0* 18.0 24.0* 36.0 48.0 54.0 
+	DS Parameter set: channel 149
+	HT operation:
+		 * primary channel: 149
+		 * secondary channel offset: no secondary
+BSS 50:c7:bf:01:02:03(on wlan9)
+	last seen: 1205.456s [boottime]
+	TSF: 12345672 usec (0d, 00:02:03)
+	freq: 5765.0
+	beacon interval: 100 TUs
+	capability: ESS Privacy ShortSlotTime (0x0411)
+	signal: -60.00 dBm
+	last seen: 122 ms ago
+	Information elements from Probe Response frame:
+	SSID: FunBox-5G
+	Supported rates: 6.0* 9.0 12.0* 18.0 24.0* 36.0 48.0 54.0 
+	DS Parameter set: channel 153
+	HT operation:
+		 * primary channel: 153
+		 * secondary channel offset: no secondary
+BSS 50:c7:bf:01:02:04(on wlan9)
+	last seen: 1206.456s [boottime]
+	TSF: 12345673 usec (0d, 00:02:03)
+	freq: 5785.0
+	beacon interval: 100 TUs
+	capability: ESS Privacy ShortSlotTime (0x0411)
+	signal: -85.00 dBm
+	last seen: 123 ms ago
+	Information elements from Probe Response frame:
+	SSID: far-away
+	Supported rates: 6.0* 9.0 12.0* 18.0 24.0* 36.0 48.0 54.0 
+	DS Parameter set: channel 157
+	HT operation:
+		 * primary channel: 157
+		 * secondary channel offset: no secondary
+BSS e4:8d:8c:aa:bb:cc(on wlan9)
+	last seen: 1207.456s [boottime]
+	TSF: 12345674 usec (0d, 00:02:03)
+	freq: 5180.0
+	beacon interval: 100 TUs
+	capability: ESS Privacy ShortSlotTime (0x0411)
+	signal: -40.00 dBm
+	last seen: 124 ms ago
+	Information elements from Probe Response frame:
+	SSID: UPC-5
+	Supported rates: 6.0* 9.0 12.0* 18.0 24.0* 36.0 48.0 54.0 
+	DS Parameter set: channel 36
+	HT operation:
+		 * primary channel: 36
+		 * secondary channel offset: no secondary
+BSS e4:8d:8c:aa:bb:cd(on wlan9)
+	last seen: 1208.456s [boottime]
+	TSF: 12345675 usec (0d, 00:02:03)
+	freq: 2412.0
+	beacon interval: 100 TUs
+	capability: ESS Privacy ShortSlotTime (0x0411)
+	signal: -50.00 dBm
+	last seen: 125 ms ago
+	Information elements from Probe Response frame:
+	SSID: UPC-2G
+	Supported rates: 6.0* 9.0 12.0* 18.0 24.0* 36.0 48.0 54.0 
+	DS Parameter set: channel 1
+	HT operation:
+		 * primary channel: 1
+		 * secondary channel offset: no secondary
+BSS 10:7b:44:00:00:01(on wlan9)
+	last seen: 1209.456s [boottime]
+	TSF: 12345676 usec (0d, 00:02:03)
+	freq: 2437.0
+	beacon interval: 100 TUs
+	capability: ESS Privacy ShortSlotTime (0x0411)
+	signal: -45.00 dBm
+	last seen: 126 ms ago
+	Information elements from Probe Response frame:
+	SSID: Orange_Swiatlowod
+	Supported rates: 6.0* 9.0 12.0* 18.0 24.0* 36.0 48.0 54.0 
+	DS Parameter set: channel 6
+	HT operation:
+		 * primary channel: 6
+		 * secondary channel offset: no secondary
+BSS 10:7b:44:00:00:02(on wlan9)
+	last seen: 1210.456s [boottime]
+	TSF: 12345677 usec (0d, 00:02:03)
+	freq: 2437.0
+	beacon interval: 100 TUs
+	capability: ESS Privacy ShortSlotTime (0x0411)
+	signal: -67.00 dBm
+	last seen: 127 ms ago
+	Information elements from Probe Response frame:
+	SSID: PLAY_INTERNET
+	Supported rates: 6.0* 9.0 12.0* 18.0 24.0* 36.0 48.0 54.0 
+	DS Parameter set: channel 6
+	HT operation:
+		 * primary channel: 6
+		 * secondary channel offset: no secondary
+BSS 10:7b:44:00:00:03(on wlan9)
+	last seen: 1211.456s [boottime]
+	TSF: 12345678 usec (0d, 00:02:03)
+	freq: 2462.0
+	beacon interval: 100 TUs
+	capability: ESS Privacy ShortSlotTime (0x0411)
+	signal: -80.00 dBm
+	last seen: 128 ms ago
+	Information elements from Probe Response frame:
+	SSID: DIRECT-printer
+	Supported rates: 6.0* 9.0 12.0* 18.0 24.0* 36.0 48.0 54.0 
+	DS Parameter set: channel 11
+	HT operation:
+		 * primary channel: 11
+		 * secondary channel offset: no secondary
+BSS 10:7b:44:00:00:04(on wlan9)
+	last seen: 1212.456s [boottime]
+	TSF: 12345679 usec (0d, 00:02:03)
+	freq: 2447.0
+	beacon interval: 100 TUs
+	capability: ESS Privacy ShortSlotTime (0x0411)
+	signal: -75.00 dBm
+	last seen: 129 ms ago
+	Information elements from Probe Response frame:
+	SSID: NETIASPOT
+	Supported rates: 6.0* 9.0 12.0* 18.0 24.0* 36.0 48.0 54.0 
+	DS Parameter set: channel 8
+	HT operation:
+		 * primary channel: 8
+		 * secondary channel offset: no secondary

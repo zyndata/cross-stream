@@ -1,0 +1,29 @@
+[Unit]
+Description=CrossStream hub (Wi-Fi hotspot + bonded tunnel)
+After=NetworkManager.service network-online.target
+Wants=NetworkManager.service network-online.target
+# A preflight error (Wi-Fi blocked or connected as a client) must not restart forever.
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+EnvironmentFile=-/etc/default/xs-hubd
+ExecStart=/usr/local/bin/xs-hubd $XS_HUBD_ARGS
+Restart=on-failure
+RestartSec=10
+# xs-hubd removes its routes, nft table and NetworkManager profiles on stop.
+TimeoutStopSec=90
+KillMode=mixed
+RuntimeDirectory=crossstream
+RuntimeDirectoryMode=0755
+StateDirectory=crossstream
+StateDirectoryMode=0700
+ProtectHome=true
+PrivateTmp=true
+NoNewPrivileges=true
+ProtectSystem=full
+ReadWritePaths=/etc/NetworkManager
+
+[Install]
+WantedBy=multi-user.target

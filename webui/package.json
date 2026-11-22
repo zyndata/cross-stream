@@ -1,0 +1,15 @@
+{
+  "name": "crossstream-server-panel",
+  "private": true,
+  "version": "0.15.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build && node scripts/csp-check.mjs && node -e \"require('fs').writeFileSync('dist/.gitkeep','')\""
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "7.3.1",
+    "svelte": "5.57.3",
+    "vite": "8.3.8"
+  }
+}

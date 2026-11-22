@@ -1,0 +1,7 @@
+# Flags for xs-hubd (installed as /etc/default/xs-hubd). Examples:
+#   -wifi-iface wlan0                 Wi-Fi card for the hotspot (default: first NetworkManager Wi-Fi device)
+#   -eth-iface eth0                   also share the tunnel on this Ethernet port (10.42.1.0/24)
+#   -dns-upstream 1.1.1.1,9.9.9.9     DNS servers asked through the tunnel
+#   -v                                debug logging
+# Hotspot name, password, band and country: xs-hubctl hotspot -ssid ... -psk ... -band a|bg -country PL
+XS_HUBD_ARGS=""

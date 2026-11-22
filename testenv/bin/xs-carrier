@@ -1,0 +1,14 @@
+#!/bin/sh
+# Carrier router: NAT the cell network into the "internet" network. netem is
+# applied by run.sh (it must first check that sch_netem exists).
+set -eu
+inet=$(xs-iface 172.30.0.)
+nft -f - <<NFT
+table ip carrier {
+	chain postrouting {
+		type nat hook postrouting priority srcnat; policy accept;
+		oifname "$inet" masquerade
+	}
+}
+NFT
+exec sleep infinity

@@ -1,0 +1,47 @@
+# Phase 02 acceptance in Docker: hub --wan--> server --inet--> origin.
+# The hub can reach the origin only through the tunnel. Run: ./run.sh
+name: xs-smoke
+services:
+  server:
+    build:
+      context: ../../..
+      dockerfile: deploy/server/Dockerfile
+      target: server
+    cap_add: [NET_ADMIN]
+    devices: [/dev/net/tun]
+    sysctls:
+      net.ipv4.ip_forward: "1"
+    environment:
+      XS_SERVER_PUBLIC_ENDPOINTS: server
+      XS_SERVER_LOG_LEVEL: debug
+      XS_SERVER_EGRESS_ALLOW: 10.250.9.0/24 # inet below: the origin has a private address
+    tmpfs: [/data]
+    networks: [wan, inet]
+
+  hub:
+    build:
+      context: ../../..
+      dockerfile: deploy/server/Dockerfile
+      target: smoke-hub
+    cap_add: [NET_ADMIN]
+    devices: [/dev/net/tun]
+    sysctls:
+      net.ipv4.conf.all.rp_filter: "0"
+      net.ipv4.conf.default.rp_filter: "0"
+    command: ["sleep", "infinity"]
+    networks: [wan]
+
+  origin:
+    build:
+      context: ../../..
+      dockerfile: deploy/server/Dockerfile
+      target: smoke-hub
+    command: ["sh", "-c", "mkdir -p /www && head -c 1048576 /dev/urandom > /www/file.bin && exec busybox-extras httpd -f -p 80 -h /www"]
+    networks: [inet]
+
+networks:
+  wan:
+    internal: true
+  inet:
+    internal: true
+    ipam: { config: [{ subnet: 10.250.9.0/24 }] }
