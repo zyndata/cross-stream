@@ -36,6 +36,7 @@ type View struct {
 	ModeSince    time.Time     `json:"mode_since"`
 	Clients      int           `json:"clients"`
 	Enrolled     bool          `json:"enrolled"`
+	Pending      bool          `json:"enroll_pending,omitempty"` // re-enrolled, the new server has not answered yet
 	TunnelUp     bool          `json:"tunnel_up"`
 	TunnelError  string        `json:"tunnel_error,omitempty"`
 	ServerEP     string        `json:"server_ep,omitempty"`
@@ -140,7 +141,7 @@ func newTracker() *tracker {
 
 func (t *tracker) view(st hubStatus, now time.Time) View {
 	v := View{State: stateOK, Hub: st.Hub, Mode: st.Mode, ModeSince: st.ModeSince, Clients: st.Clients,
-		Enrolled: st.Enrolled, TunnelUp: st.TunnelUp, TunnelError: st.TunnelError, ServerEP: st.ServerEP,
+		Enrolled: st.Enrolled, Pending: st.Pending, TunnelUp: st.TunnelUp, TunnelError: st.TunnelError, ServerEP: st.ServerEP,
 		Direct: st.Direct, PEP: st.PEP, Warnings: st.Warnings, LogLevel: st.LogLevel, OverflowMbps: st.OverflowMbps, BondMode: st.BondMode,
 		Redundancy: st.Redundancy, Redundant: st.Redundant, Testing: st.Testing, Relays: []RelayView{}, Uplinks: []UplinkView{}}
 	seen := make(map[string]bool, len(st.Relays))

@@ -95,6 +95,8 @@ type DaemonConfig struct {
 	// TCPConns > 0 fixes the number of TCP connections of every tcp:// path
 	// (hidden test override, xs-hubd -tcp-conns); 0 = connPolicy decides.
 	TCPConns int
+
+	enrollAttempts int // tests: INITs an Enroll call sends (0 = EnrollAttempts)
 }
 
 // Daemon is the hub: relay control and data servers, the relay registry,
@@ -454,24 +456,30 @@ func (d *Daemon) Run(parent context.Context) error {
 	return nil
 }
 
-// setServerEP records the server endpoint relays forward to and tells every
-// connected relay when it changes.
+// setServerEP records the server endpoint relays forward to and moves every
+// path that is elsewhere (a new server, or a path endpointFallback moved to
+// TCP/WSS) to it. A path already on ep is left alone: a relay redials on
+// every endpoint message.
 func (d *Daemon) setServerEP(ep string) {
 	d.mu.Lock()
-	if d.serverEP == ep {
-		d.mu.Unlock()
-		return
+	if d.serverEP != ep {
+		d.serverEP = ep
+		clear(d.lastEP)
 	}
-	d.serverEP = ep
-	rcs := d.connected()
-	lps := d.localPaths()
-	for _, lp := range lps {
-		lp.setEP(ep)
+	var rcs []*relayPath
+	for _, rc := range d.connected() {
+		if rc.ep != ep {
+			rc.setEP(ep)
+			rcs = append(rcs, rc)
+		}
 	}
-	for _, rc := range rcs {
-		rc.setEP(ep)
+	var lps []*localPath
+	for _, lp := range d.localPaths() {
+		if lp.ep != ep {
+			lp.setEP(ep)
+			lps = append(lps, lp)
+		}
 	}
-	clear(d.lastEP)
 	d.mu.Unlock()
 	for _, rc := range rcs {
 		d.sendEndpoint(rc)

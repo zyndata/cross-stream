@@ -104,6 +104,10 @@ func (d *Daemon) endpointFallback(now time.Time, st bond.Stats) {
 		wait *= 3
 	}
 	d.mu.Lock()
+	if d.enrolling { // d.enr is the old server's: no move while the new one is asked
+		d.mu.Unlock()
+		return
+	}
 	var eps []string
 	if d.enr != nil {
 		eps = orderedEndpoints(d.enr.Endpoints)

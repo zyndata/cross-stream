@@ -80,6 +80,10 @@
         throw new Error(enrollErrorText(e))
       }
       code = ''
+      if (enrolled.pending) {
+        notify('Nowy serwer jeszcze nie odpowiedział — hub przełączył się na niego i ponawia próby')
+        return
+      }
       notify(again ? 'Hub zarejestrowany ponownie — usługa uruchamia się od nowa' : 'Hub zarejestrowany na serwerze')
     })
 </script>
@@ -163,7 +167,9 @@
   <div class="card">
     <h2>Serwer</h2>
     {#if view.enrolled}
-      <p>Zarejestrowany{#if view.server_ep}: <code>{view.server_ep}</code>{/if}</p>
+      <p>
+        {view.enroll_pending ? 'Rejestracja w toku (nowy serwer jeszcze nie odpowiedział)' : 'Zarejestrowany'}{#if view.server_ep}: <code>{view.server_ep}</code>{/if}
+      </p>
       <p class="muted small">Tunel: {view.tunnel_up ? 'działa' : 'nie działa'}{view.tunnel_error ? ` (${view.tunnel_error})` : ''}</p>
     {:else}
       <p>Hub nie jest jeszcze zarejestrowany.</p>
@@ -182,7 +188,12 @@
         {busy ? 'Rejestruję…' : view.enrolled ? 'Zarejestruj ponownie' : 'Zarejestruj'}
       </button>
     </form>
-    {#if enrolled}
+    {#if enrolled?.pending}
+      <div class="banner result">
+        Przełączono na nowy serwer jako <b>{enrolled.name}</b>; czekam na jego odpowiedź (hub ponawia próby).
+        <br />Serwer: {enrolled.endpoints?.join(', ')}
+      </div>
+    {:else if enrolled}
       <div class="banner result">
         Zarejestrowano jako <b>{enrolled.name}</b>, adres w tunelu <code>{enrolled.tunnel_ip}</code>, MTU {enrolled.mtu}.
         <br />Serwer: {enrolled.endpoints?.join(', ')}

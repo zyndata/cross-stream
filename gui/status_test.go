@@ -16,7 +16,7 @@ import (
 // renamed JSON field in internal/hub fails here.
 func TestStatusMatchesHub(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Second)
-	src := hub.Status{Hub: "dell", Mode: hub.ModeBonded, ModeSince: now, Clients: 3, Enrolled: true,
+	src := hub.Status{Hub: "dell", Mode: hub.ModeBonded, ModeSince: now, Clients: 3, Enrolled: true, EnrollPending: true,
 		TunnelIP: "10.99.0.2", TunnelUp: true, ServerEP: "1.2.3.4:51820", Bond: &hub.BondStatus{},
 		Direct: &hub.DirectStatus{Draining: true, TCP: 4, UDP: 2}, PEP: &hub.PEPStatus{On: true, Available: true, Streams: 6, Flows: 5},
 		Warnings: []string{"w"}, OverflowMbps: 12,
@@ -37,7 +37,7 @@ func TestStatusMatchesHub(t *testing.T) {
 	if err := json.Unmarshal(b, &got); err != nil {
 		t.Fatal(err)
 	}
-	if got.Hub != "dell" || got.Mode != "BONDED" || !got.ModeSince.Equal(now) || got.Clients != 3 || !got.Enrolled ||
+	if got.Hub != "dell" || got.Mode != "BONDED" || !got.ModeSince.Equal(now) || got.Clients != 3 || !got.Enrolled || !got.Pending ||
 		!got.TunnelUp || got.ServerEP == "" || got.Bond == nil || got.Direct == nil || !got.Direct.Draining ||
 		got.Direct.TCP != 4 || got.OverflowMbps != 12 || len(got.Warnings) != 1 || got.BondMode != "min_latency" ||
 		got.Redundancy != "on" || !got.Redundant || !got.Testing {

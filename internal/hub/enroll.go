@@ -13,8 +13,9 @@ import (
 	"github.com/zyndata/cross-stream/internal/enroll"
 )
 
-// EnrollAttempts is how many INITs enrollment sends (waits 1+2+4 s).
-const EnrollAttempts = 3
+// EnrollAttempts is how many INITs enrollment sends (waits 1+2+4+8 s: one
+// lost answer on a phone path must not fail it; xs-hubctl waits 30 s).
+const EnrollAttempts = 4
 
 // EnrollWithCode enrolls this hub with an XS1 code: it loads or creates the
 // hub key in dir, runs the handshake with the code's token over conn and

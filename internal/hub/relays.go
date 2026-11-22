@@ -135,7 +135,7 @@ func (d *Daemon) serveRelay(c net.Conn) {
 	rc.initConns(d.cfg.TCPConns)
 	d.mu.Lock()
 	rc.setEP(d.serverEP)
-	if ep, ok := d.lastEP[rec.ID]; ok && d.enr != nil && slices.Contains(orderedEndpoints(d.enr.Endpoints), ep) {
+	if ep, ok := d.lastEP[rec.ID]; ok && !d.enrolling && d.enr != nil && slices.Contains(orderedEndpoints(d.enr.Endpoints), ep) {
 		rc.setEP(ep) // the endpoint that worked last time (e.g. TCP on a UDP-blocking carrier)
 	}
 	d.mu.Unlock()

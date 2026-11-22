@@ -25,12 +25,26 @@
     }
   }
 
+  let codeArea = $state(null)
+
+  // The Clipboard API needs a secure context and, inside the Home Assistant
+  // ingress iframe, a clipboard-write permission the iframe does not grant:
+  // fall back to selecting the textarea and execCommand('copy').
   async function copy() {
+    error = ''
     try {
       await navigator.clipboard.writeText(result.code)
       copied = true
+      return
     } catch {
-      error = 'Nie udało się skopiować — zaznacz kod i skopiuj ręcznie.'
+      // fall through to the legacy path
+    }
+    codeArea?.focus()
+    codeArea?.select()
+    if (document.execCommand?.('copy')) {
+      copied = true
+    } else {
+      error = 'Nie udało się skopiować — kod jest zaznaczony, naciśnij Ctrl+C.'
     }
   }
 </script>
@@ -52,7 +66,7 @@
       </form>
     {:else}
       <p>Kod dla huba <b>{name.trim()}</b> — pokazany tylko teraz:</p>
-      <textarea readonly rows="4" value={result.code} onfocus={(e) => e.currentTarget.select()}></textarea>
+      <textarea bind:this={codeArea} readonly rows="4" value={result.code} onfocus={(e) => e.currentTarget.select()}></textarea>
       <p class="muted small">Ważny do {when(result.expires)}. Po zamknięciu okna kodu nie da się wyświetlić ponownie.</p>
       {#if error}<div class="banner bad">{error}</div>{/if}
       <div class="buttons">

@@ -3,6 +3,17 @@
 All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [0.10.0] - 2026-11-22
+
+### Added
+
+- **relay:** Pull down on the home screen to refresh the hubs' status
+
+### Fixed
+
+- **hub:** Re-enrollment replaces the server even when its answer is lost
+- **webui:** Copy the enrollment code inside the Home Assistant panel
+
 ## [0.9.0] - 2026-11-22
 
 ### Added

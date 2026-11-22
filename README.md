@@ -10,7 +10,7 @@ self-hosted, end-to-end encrypted, shared as a Wi-Fi hotspot.**
 ![Platforms](https://img.shields.io/badge/hub-Linux%20%7C%20Windows-informational)
 ![Relay](https://img.shields.io/badge/relay-Android%2010%2B-green)
 
-> **Status:** beta — `v0.9.0` is the first release. The field test (real carriers, a day
+> **Status:** beta — latest release `v0.10.0`. The field test (real carriers, a day
 > away from home) is still in progress; `v1.0.0` follows it. Everything below works and is
 > tested in the Docker test environment, and most of it on real phones and laptops —
 > see [Status and limitations](#status-and-limitations) for what is not yet tried on hardware.
@@ -50,7 +50,8 @@ CrossStream does exactly that:
   Ethernet, if any) into one encrypted tunnel and shares it as a **Wi-Fi hotspot**. Any
   device joins that hotspot — nothing to install on it.
 - **Your own server** puts the streams back together and sends the traffic to the internet.
-  Run it on a Linux box, a VPS or as a **Home Assistant app**.
+  Any Linux machine with Docker works — a small VPS or a home server. If you already run
+  Home Assistant, it can also be installed there as an app.
 
 Highlights:
 
@@ -80,7 +81,7 @@ flowchart LR
         P2["Phone B<br/>carrier 2"]
         P3["Phone C<br/>carrier 3"]
     end
-    S["Your server<br/>xs-server (Docker / Home Assistant)"]
+    S["Your server<br/>xs-server (VPS or home server)"]
     I(("Internet"))
 
     L1 -- "Wi-Fi" --> H
@@ -99,8 +100,8 @@ their mobile data. The tunnel is encrypted between the **hub and the server**
 
 | Part | Program | Runs on |
 |---|---|---|
-| Server | `xs-server`, admin CLI `xs-ctl`, web panel | Linux with Docker, or Home Assistant OS (amd64 / aarch64) |
-| Hub | `xs-hubd` (service), `xs-hubctl` (CLI), `xs-hub-gui` (desktop app) | Linux laptop (amd64; arm64 without GUI), Windows 11 laptop |
+| Server | `xs-server`, admin CLI `xs-ctl`, web panel | Linux with Docker (VPS or home server); optionally a Home Assistant app (amd64 / aarch64) |
+| Hub | `xs-hubd` (service), `xs-hubctl` (CLI), `xs-hub-gui` (desktop app) | Linux laptop (amd64; arm64 without GUI), Windows 11 laptop (Windows 10: built, untested) |
 | Relay | CrossStream relay app | Android 10 or newer |
 
 ## Download
@@ -154,8 +155,8 @@ speed (a home server on 600/100 fibre gives at most ~100 Mb/s).
 
 ## Quick start
 
-1. **Server** — install it ([Home Assistant](#home-assistant-app-easiest) or
-   [Docker](#docker-on-linux)), forward UDP + TCP 51900 on your router (or pick
+1. **Server** — install it with [Docker](#docker-on-linux) on a VPS or a home Linux server
+   (or as a [Home Assistant app](#home-assistant-app-optional)), forward UDP + TCP 51900 on your router (or pick
    [another port](#tunnel-port) now), and set the address hubs should use — best a dynamic
    DNS name, so a changing home IP doesn't matter.
 2. **Hub** — install it on the laptop ([Linux](#linux) / [Windows](#windows)) and start it:
@@ -168,31 +169,21 @@ speed (a home server on 600/100 fibre gives at most ~100 Mb/s).
    the hub reaches the server through the phone. Without a phone it uses a local link or the
    laptop's own internet — that fails when the server is in the same home network behind a
    router without hairpin NAT.
+   A code for another server (hub app → *Ustawienia* → *Zarejestruj ponownie*) replaces the
+   current server. If the new server does not answer at once, the hub still switches to it and
+   keeps trying through the phones until it does (banner "Czekam na odpowiedź nowego serwera").
 5. **Connect** — join the hotspot from any device. The hub app shows the mode
    (bonded / direct / offline), every phone's speed, signal and data used.
 
 ## Install: server
 
-### Home Assistant app (easiest)
-
-Home Assistant OS or Supervised, amd64 or aarch64.
-
-1. Settings → Apps → App store → ⋮ → **Repositories** → add
-   `https://github.com/zyndata/cross-stream`.
-2. Install **CrossStream Server**, set **Public endpoints** (your dynamic DNS name or public IP),
-   turn on *Start on boot* and *Watchdog*, start it.
-3. Router: forward **UDP and TCP 51900** to the Home Assistant host.
-4. Open **CrossStream** in the sidebar (no extra login; Home Assistant administrators only).
-
-Updates come through Home Assistant's *Update* button. Full guide:
-[ha/crossstream_server/DOCS.md](ha/crossstream_server/DOCS.md).
-Without internet access from HA to GitHub, unpack `crossstream-ha-app-vX.Y.Z.tar.gz` into
-`/addons/` and install it from *Local apps*.
+The server is one Docker container. Run it on a Linux machine you control — a small VPS or
+a home server — or, if you already have Home Assistant, as a Home Assistant app. Both run the
+same server with the same web panel and admin CLI.
 
 ### Docker on Linux
 
-Recommended for a VPS or a home Linux server: Docker Engine with the compose plugin, host
-networking. From a checkout of this repository:
+Docker Engine with the compose plugin, host networking. From a checkout of this repository:
 
 ```sh
 cd deploy/server
@@ -211,6 +202,23 @@ tunnel-port | restart`.
 The web panel listens on `https://localhost:8443` only (`xs-ctl admin add <user>`, optional
 TOTP); reach it from elsewhere through `ssh -N -L 8443:localhost:8443 <server>`.
 
+### Home Assistant app (optional)
+
+An alternative for a home server that already runs Home Assistant OS or Supervised
+(amd64 or aarch64).
+
+1. Settings → Apps → App store → ⋮ → **Repositories** → add
+   `https://github.com/zyndata/cross-stream`.
+2. Install **CrossStream Server**, set **Public endpoints** (your dynamic DNS name or public IP),
+   turn on *Start on boot* and *Watchdog*, start it.
+3. Router: forward **UDP and TCP 51900** to the Home Assistant host.
+4. Open **CrossStream** in the sidebar (no extra login; Home Assistant administrators only).
+
+Updates come through Home Assistant's *Update* button. Full guide:
+[ha/crossstream_server/DOCS.md](ha/crossstream_server/DOCS.md).
+Without internet access from HA to GitHub, unpack `crossstream-ha-app-vX.Y.Z.tar.gz` into
+`/addons/` and install it from *Local apps*.
+
 ### Tunnel port
 
 Hubs connect to **port 51900** (UDP, and TCP as a fallback) unless you choose another one —
@@ -220,8 +228,8 @@ and changes it there:
 
 | Server | Where the port lives | Change it with |
 |---|---|---|
-| Home Assistant | the app's *Network* section (`51900/udp` and `51900/tcp`, same port) | that section, the web panel (*Serwer* → *Port tunelu*) or `xs-ctl tunnel-port 51901` |
-| Docker | `public_port` in `data/server.yaml` (or `XS_SERVER_PUBLIC_PORT`, then read-only) | the web panel, `xs-ctl tunnel-port 51901`, or the file |
+| Docker | `public_port` in `data/server.yaml` (or `XS_SERVER_PUBLIC_PORT`, then read-only) | the web panel (*Serwer* → *Port tunelu*), `xs-ctl tunnel-port 51901`, or the file |
+| Home Assistant | the app's *Network* section (`51900/udp` and `51900/tcp`, same port) | that section, the web panel or `xs-ctl tunnel-port 51901` |
 
 A new port applies after a **restart**: until then the web panel shows *Wymagany restart*
 (restart required) on every page, with a button that restarts the server (`xs-ctl restart`
@@ -309,6 +317,8 @@ Settings a friend controls (the hub cannot override them): data limit per
 session / day / month (stop or slow down when reached), battery threshold (default 20 %),
 how this hub may use the phone (normal / only when needed / only as backup), start on boot.
 The app remembers several hubs and connects by itself to the strongest one in range.
+Pull the main screen down to refresh which hubs are in range right away (Android allows a few
+Wi-Fi scans per two minutes; after that the last scan is shown).
 App language: English or Polish.
 
 ## Everyday use
@@ -359,7 +369,7 @@ restart button) and an audit log.
 | Relay app | Checks when opened (can be switched off in Settings → Updates); installs through the Android installer on request. |
 | Hub app | Checks at start (Ustawienia → Aktualizacje); downloads the hub package, verifies its SHA-256 and installs it after an admin prompt (pkexec / UAC). |
 | Hub CLI | `xs-hubctl update` shows what's new; `sudo xs-hubctl update -install` installs it. Never checks on its own. |
-| Server | Home Assistant: the *Update* button. Docker: load the new image and restart (or `deploy/server/remote-deploy.sh`, which rolls back by itself on failure). |
+| Server | Docker: load the new image and restart (or `deploy/server/remote-deploy.sh`, which rolls back by itself on failure). Home Assistant: the *Update* button. |
 
 Releases follow [Semantic Versioning](https://semver.org/). Update the **server first**
 when a release notes a protocol change.
@@ -388,7 +398,8 @@ when a release notes a protocol change.
   carrier's terms may still treat relaying as tethering — **tell friends before they share**.
 - Only relayed data counts toward the app's limits; the phone's own use also eats the plan.
   Over the limit the app stops or slows to a trickle (still useful as a backup link).
-- A speed test uses the phones' mobile data (up to 20 MB per phone and direction by default);
+- A speed test uses the phones' mobile data (up to 20 MB per phone and direction by default;
+  a phone the first round could not saturate is measured once more with 3× that budget);
   the hub app asks first.
 - The app stops relaying below the battery threshold, when mobile data has no internet
   (e.g. prepaid credit used up), or when you tap *Stop* in its notification.
@@ -396,8 +407,8 @@ when a release notes a protocol change.
 ## Status and limitations
 
 **Tested on real hardware:** Linux hub (Ubuntu laptop) and Windows 11 hub with Samsung
-Galaxy S23-series phones on LTE/5G plus the laptop's SIM modem; server as a Home Assistant app
-(amd64) and on Ubuntu Server 24.04 with Docker. Example measurements at home (one phone + one
+Galaxy S23-series phones on LTE/5G plus the laptop's SIM modem; server on Ubuntu Server 24.04
+with Docker and as a Home Assistant app (amd64). Example measurements at home (one phone + one
 LTE modem, server behind 100 Mb/s upload): 27 Mb/s bonded without and 72 Mb/s with the TCP
 accelerator; plain TCP to the server bonded 2.4–2.6× the best single link. Your results depend
 on coverage and carriers.
@@ -450,6 +461,19 @@ Layout: [docs/repo-structure.md](docs/repo-structure.md). Test environment:
 
 Highlights of each release, newest first. Every change: [CHANGELOG.md](CHANGELOG.md).
 
+### v0.10.0 — 2026-11-22
+
+- Hub: a code for another server now always moves the hub to it. If the server's answer gets
+  lost on the way, the hub keeps retrying through the phones (banner "Czekam na odpowiedź
+  nowego serwera", `enroll_pending` in `xs-hubctl status`) instead of staying on the old
+  server in direct mode.
+- Hub: phones no longer switch between UDP and TCP in the middle of an enrollment; when the
+  server does not answer, the hub app suggests trying the same code again.
+- Relay app: pull the main screen down to refresh which hubs are in range, also while
+  sharing is on.
+- Web panel in Home Assistant: the *Kopiuj* button for an enrollment code now works inside the sidebar.
+- **Upgrade:** no special order — `v0.9.0` and `v0.10.0` hubs, servers and phones work together.
+
 ### v0.9.0 — 2026-11-22
 
 First public release (beta).
@@ -457,7 +481,7 @@ First public release (beta).
 - Bonds the mobile data of several Android phones (plus the laptop's own SIM modem, USB
   tethering or Ethernet) into one encrypted tunnel, shared as a Wi-Fi hotspot by a Linux or
   Windows 11 hub.
-- Server as a Home Assistant app (amd64 / aarch64) or a Docker image, with a web panel,
+- Server as a Docker image or a Home Assistant app (amd64 / aarch64), with a web panel,
   enrollment codes and a configurable tunnel port.
 - Max-throughput and min-latency modes, TCP accelerator, failover under 1 s, DIRECT fallback
   when the server is down.

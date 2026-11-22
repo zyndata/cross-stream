@@ -13,6 +13,7 @@ type hubStatus struct {
 	ModeSince    time.Time      `json:"mode_since"`
 	Clients      int            `json:"clients"`
 	Enrolled     bool           `json:"enrolled"`
+	Pending      bool           `json:"enroll_pending"`
 	TunnelIP     string         `json:"tunnel_ip"`
 	TunnelUp     bool           `json:"tunnel_up"`
 	TunnelError  string         `json:"tunnel_error"`
@@ -176,4 +177,5 @@ type Enrollment struct {
 	Endpoints []string `json:"endpoints"`
 	TunnelIP  string   `json:"tunnel_ip"`
 	MTU       int      `json:"mtu"`
+	Pending   bool     `json:"pending"` // the new server has not answered yet
 }

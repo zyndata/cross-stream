@@ -12,6 +12,7 @@ import (
 	"github.com/google/go-tpm/tpm2/transport"
 
 	"github.com/zyndata/cross-stream/internal/crypto"
+	"github.com/zyndata/cross-stream/internal/enroll"
 	"github.com/zyndata/cross-stream/internal/hub/tpmkey"
 )
 
@@ -23,14 +24,30 @@ const (
 	EnrollmentFile = "server.json" // server key, endpoints, tunnel address
 )
 
-// Enrollment is what a hub keeps after a successful enrollment. The token is
-// not stored: it is single-use and already spent.
+// Enrollment is what a hub keeps after an enrollment.
 type Enrollment struct {
 	Name      string   `json:"name"`
 	ServerKey string   `json:"server_key"` // base64 X25519
 	Endpoints []string `json:"endpoints"`
 	TunnelIP  string   `json:"tunnel_ip"`
 	MTU       int      `json:"mtu"`
+	// Token is kept only while a re-enrollment is pending: the new server
+	// has not answered yet (its answer may have been lost on the way). The
+	// tunnel sends it with every handshake until the server answers, then it
+	// is dropped; TunnelIP and MTU are the previous server's until then.
+	Token string `json:"token,omitempty"`
+	// Pending marks an RPC result whose enrollment is pending (never saved;
+	// the token is not returned).
+	Pending bool `json:"pending,omitempty"`
+}
+
+// pending reports whether the server has not confirmed the enrollment yet.
+func (e Enrollment) pending() bool { return e.Token != "" }
+
+// result is e as returned over IPC: no token, Pending set instead.
+func (e Enrollment) result() Enrollment {
+	e.Pending, e.Token = e.pending(), ""
+	return e
 }
 
 // LoadOrCreateKey returns the hub keypair from dir: unsealed from
@@ -171,6 +188,7 @@ func loadOrCreateKeyFile(dir, file string) (crypto.Keypair, error) {
 
 // SaveEnrollment writes e to dir (atomic rename).
 func SaveEnrollment(dir string, e Enrollment) error {
+	e.Pending = false
 	b, err := json.MarshalIndent(e, "", "  ")
 	if err != nil {
 		return fmt.Errorf("save enrollment: %w", err)
@@ -206,5 +224,11 @@ func LoadEnrollment(dir string) (Enrollment, error) {
 	if _, err := crypto.ParseKey(e.ServerKey); err != nil || len(e.Endpoints) == 0 || e.TunnelIP == "" {
 		return Enrollment{}, errors.New("parse enrollment: missing server key, endpoints or tunnel ip")
 	}
+	if e.pending() {
+		if _, err := enroll.ParseToken(e.Token); err != nil {
+			return Enrollment{}, fmt.Errorf("parse enrollment: %w", err)
+		}
+	}
+	e.Pending = false
 	return e, nil
 }

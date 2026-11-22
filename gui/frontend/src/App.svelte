@@ -82,6 +82,13 @@
         {#if view.direct?.draining}<br />Kończenie starych połączeń po powrocie tunelu…{/if}
       </div>
     {/if}
+    {#if view.enroll_pending}
+      <div class="banner warn">
+        <b>Czekam na odpowiedź nowego serwera.</b>
+        Hub przełączył się na serwer z nowego kodu i ponawia rejestrację przez telefony, dopóki serwer nie odpowie.
+        Jeśli to trwa długo, sprawdź, czy serwer działa i czy kod nie wygasł (ważny 24 h).
+      </div>
+    {/if}
     {#if !view.enrolled}
       <div class="banner warn">
         Hub nie jest zarejestrowany na serwerze.

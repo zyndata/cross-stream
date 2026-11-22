@@ -42,21 +42,24 @@ const (
 
 // Status is the result of MethodStatus.
 type Status struct {
-	Hub         string        `json:"hub"`
-	Mode        Mode          `json:"mode"`
-	ModeSince   time.Time     `json:"mode_since,omitzero"`
-	Clients     int           `json:"clients"` // hotspot stations
-	Inhibited   bool          `json:"sleep_inhibited"`
-	Enrolled    bool          `json:"enrolled"`
-	TunnelIP    string        `json:"tunnel_ip,omitempty"`
-	TunnelUp    bool          `json:"tunnel_up"`
-	TunnelError string        `json:"tunnel_error,omitempty"`
-	ServerEP    string        `json:"server_ep,omitempty"`
-	TunnelMTU   int           `json:"tunnel_mtu,omitempty"`
-	Bond        *BondStatus   `json:"bond,omitempty"`
-	Direct      *DirectStatus `json:"direct,omitempty"`
-	PEP         *PEPStatus    `json:"pep,omitempty"`
-	Warnings    []string      `json:"warnings,omitempty"`
+	Hub       string    `json:"hub"`
+	Mode      Mode      `json:"mode"`
+	ModeSince time.Time `json:"mode_since,omitzero"`
+	Clients   int       `json:"clients"` // hotspot stations
+	Inhibited bool      `json:"sleep_inhibited"`
+	Enrolled  bool      `json:"enrolled"`
+	// EnrollPending: re-enrolled, the new server has not answered yet (the
+	// tunnel keeps trying with the code; TunnelIP is empty until then).
+	EnrollPending bool          `json:"enroll_pending,omitempty"`
+	TunnelIP      string        `json:"tunnel_ip,omitempty"`
+	TunnelUp      bool          `json:"tunnel_up"`
+	TunnelError   string        `json:"tunnel_error,omitempty"`
+	ServerEP      string        `json:"server_ep,omitempty"`
+	TunnelMTU     int           `json:"tunnel_mtu,omitempty"`
+	Bond          *BondStatus   `json:"bond,omitempty"`
+	Direct        *DirectStatus `json:"direct,omitempty"`
+	PEP           *PEPStatus    `json:"pep,omitempty"`
+	Warnings      []string      `json:"warnings,omitempty"`
 	// OverflowMbps is the hub-wide overflow setting (settings.get).
 	OverflowMbps uint16 `json:"overflow_mbps"`
 	// BondMode (max_throughput / min_latency) and Redundancy (off / auto /
@@ -261,7 +264,10 @@ func (d *Daemon) Status() Status {
 	st.BondMode, st.Redundancy = set.Mode, set.Redundancy
 	st.Mode, st.ModeSince = d.modes.Mode()
 	if d.enr != nil {
-		st.TunnelIP = d.enr.TunnelIP
+		st.EnrollPending = d.enr.pending()
+		if !st.EnrollPending {
+			st.TunnelIP = d.enr.TunnelIP
+		}
 	}
 	if d.tunnelErr != nil {
 		st.TunnelError = d.tunnelErr.Error()

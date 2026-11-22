@@ -1,6 +1,7 @@
 package hub
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/zyndata/cross-stream/internal/crypto"
 	"github.com/zyndata/cross-stream/internal/enroll"
+	"github.com/zyndata/cross-stream/internal/session"
 	"github.com/zyndata/cross-stream/internal/tun"
 )
 
@@ -85,6 +87,15 @@ func (d *Daemon) startTunnel(e Enrollment) error {
 	if o, err := d.Settings().bondOpts(); err == nil {
 		c.Bond = o
 	}
+	if e.pending() {
+		tok, err := enroll.ParseToken(e.Token) // checked by LoadEnrollment
+		if err != nil {
+			return fmt.Errorf("pending enrollment: %w", err)
+		}
+		c.Token = &tok
+		c.OnEnrolled = func(resp session.RespPayload) { d.confirmEnrollment(e, resp) }
+		d.log.Info("enrollment pending: waiting for the new server's answer", "name", e.Name)
+	}
 	d.client.Store(c)
 	d.pushForwards()
 	d.setServerEP(firstEndpoint(e.Endpoints))
@@ -156,10 +167,18 @@ const restartDelay = 500 * time.Millisecond
 
 // Enroll enrolls this hub with an XS1 code through a connected relay or
 // local link (or, with neither, the computer's own connection), saves
-// the result and brings the tunnel up. An enrolled hub enrolls again (new
-// server or a revoked hub): the old session stops for the handshake, the new
-// server.json replaces the old one only on success, and the daemon restarts
-// either way (the TUN, routes and DIRECT state are rebuilt from server.json).
+// the result and brings the tunnel up.
+//
+// An enrolled hub enrolls again (new server or a revoked hub): the new
+// server replaces the old one. The old session stops for the handshake and
+// the daemon restarts afterwards (the TUN, routes and DIRECT state are
+// rebuilt from server.json). When the new server does not answer in time
+// (it may have registered the hub and its answer got lost, e.g. on a phone
+// that was switching endpoints), the enrollment is saved as pending: the
+// tunnel keeps sending the code's token until the server answers (a server
+// that knows this hub key answers without it). Only a code that cannot be
+// used (malformed, no udp:// endpoint) or a cancelled call keeps the old
+// server.
 func (d *Daemon) Enroll(ctx context.Context, code string) (Enrollment, error) {
 	c, err := enroll.ParseCode(code)
 	if err != nil {
@@ -170,10 +189,14 @@ func (d *Daemon) Enroll(ctx context.Context, code string) (Enrollment, error) {
 		return Enrollment{}, errors.New("enroll: the code has no udp:// endpoint")
 	}
 	d.mu.Lock()
-	again := d.enr != nil
 	if d.enrolling {
 		d.mu.Unlock()
 		return Enrollment{}, errors.New("enroll: an enrollment is already running")
+	}
+	var old Enrollment
+	again := d.enr != nil
+	if again {
+		old = *d.enr
 	}
 	route := enrollViaPhone
 	switch {
@@ -182,7 +205,7 @@ func (d *Daemon) Enroll(ctx context.Context, code string) (Enrollment, error) {
 	case len(d.relays) == 0:
 		route = enrollViaLocal
 	}
-	d.enrolling = true
+	d.enrolling = true // endpointFallback stays off: it follows the old server's endpoints
 	d.mu.Unlock()
 	defer func() {
 		d.mu.Lock()
@@ -218,22 +241,52 @@ func (d *Daemon) Enroll(ctx context.Context, code string) (Enrollment, error) {
 		}
 		d.client.Store(cl)
 	}
-	resp, err := cl.Enroll(ctx, EnrollAttempts)
+	resp, err := cl.Enroll(ctx, cmp.Or(d.cfg.enrollAttempts, EnrollAttempts))
 	d.client.CompareAndSwap(cl, nil)
-	if err != nil {
+	e := Enrollment{Name: c.Name, ServerKey: crypto.EncodeKey(c.ServerKey), Endpoints: c.Endpoints}
+	switch {
+	case err == nil:
+		e.TunnelIP, e.MTU = resp.TunnelIP, resp.MTU
+	case again && errors.Is(err, ErrNoResponse):
+		// The TUN keeps the old address until the server assigns one.
+		e.TunnelIP, e.MTU, e.Token = old.TunnelIP, old.MTU, c.Token.String()
+	default:
 		return Enrollment{}, enrollError(err, route)
 	}
-	e := Enrollment{Name: c.Name, ServerKey: crypto.EncodeKey(c.ServerKey), Endpoints: c.Endpoints,
-		TunnelIP: resp.TunnelIP, MTU: resp.MTU}
 	if err := SaveEnrollment(d.cfg.Dir, e); err != nil {
 		return Enrollment{}, err
 	}
+	if e.pending() {
+		d.log.Warn("no answer from the new server yet: switched to it, the tunnel keeps trying with the code",
+			"name", e.Name, "route", route)
+		return e.result(), nil
+	}
 	d.log.Info("hub enrolled", "name", e.Name, "tunnel_ip", e.TunnelIP, "again", again)
 	if again {
-		return e, nil // the restart brings the new tunnel up
+		return e.result(), nil // the restart brings the new tunnel up
 	}
 	d.mu.Lock()
 	d.enr = &e
 	d.mu.Unlock()
-	return e, d.startTunnel(e)
+	return e.result(), d.startTunnel(e)
+}
+
+// confirmEnrollment saves a pending enrollment once its server answered: the
+// token is dropped and the server's tunnel address and MTU replace the old
+// server's. A changed address or MTU restarts the daemon (TUN and routes are
+// built from them).
+func (d *Daemon) confirmEnrollment(e Enrollment, resp session.RespPayload) {
+	restart := e.TunnelIP != resp.TunnelIP || e.MTU != resp.MTU
+	e.Token, e.TunnelIP, e.MTU = "", resp.TunnelIP, resp.MTU
+	if err := SaveEnrollment(d.cfg.Dir, e); err != nil {
+		d.log.Error("enrollment answered but not saved: the next start sends the code again", "err", err)
+		return
+	}
+	d.mu.Lock()
+	d.enr = &e
+	d.mu.Unlock()
+	d.log.Info("hub enrolled", "name", e.Name, "tunnel_ip", e.TunnelIP, "again", true, "restart", restart)
+	if restart {
+		d.requestRestart(restartDelay)
+	}
 }

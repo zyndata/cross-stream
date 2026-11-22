@@ -42,9 +42,13 @@ type Client struct {
 	Uplink    Uplink           // used when Conn is nil
 	Name      string
 	Version   string
-	Token     *enroll.Token // set only to enroll
+	Token     *enroll.Token // set to enroll (Enroll, or Run of a pending enrollment)
 	TUN       tun.Device    // nil for Enroll; owned and closed by Run
-	Log       *slog.Logger
+	// OnEnrolled is called by Run once, when the first handshake that
+	// carried Token succeeds (the pending enrollment is confirmed); Run then
+	// drops Token.
+	OnEnrolled func(session.RespPayload)
+	Log        *slog.Logger
 	// OverflowMbps: secondary paths stay unused while normal paths send at
 	// least this much (0 = off); sent to the server in SESSION_CONFIG.
 	OverflowMbps uint16
@@ -197,6 +201,12 @@ func (c *Client) Run(ctx context.Context) error {
 		resp, keys, r, err := c.handshake(ctx, 0)
 		if err != nil {
 			return err
+		}
+		if c.Token != nil { // Token is only read by handshake, in this goroutine
+			c.Token = nil
+			if c.OnEnrolled != nil {
+				c.OnEnrolled(resp)
+			}
 		}
 		c.install(resp, keys, r)
 		if err := c.maintain(ctx); err != nil {

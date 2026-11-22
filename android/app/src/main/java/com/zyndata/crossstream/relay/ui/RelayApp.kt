@@ -11,6 +11,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
@@ -26,6 +27,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.ui.draw.scale
 import androidx.compose.material3.Switch
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -164,8 +166,8 @@ private fun HomeScreen(
     val permissions = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
         onToggle(true) // works without them, just with less: no notification, no scan → last used hub
     }
-    // With the relay off, scan results the system already has show which hubs are in range;
-    // "Refresh" asks for a fresh scan (user tap only, no background work) and reads them again.
+    // Scan results the system already has show which hubs are in range; pulling the screen
+    // down (or "Refresh" with the relay off) asks for a fresh scan and reads them again.
     var scanTick by remember { mutableStateOf(0) }
     var scanning by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
@@ -182,90 +184,96 @@ private fun HomeScreen(
     LaunchedEffect(visible, state.phase) {
         if (state.phase == Phase.SEARCHING && !visible.isNullOrEmpty()) RelayStateHolder.wakeSearch()
     }
-    Column(
-        modifier = Modifier.safeDrawingPadding().verticalScroll(rememberScrollState()).padding(20.dp).fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f))
-            TextButton(onClick = onSettings) { Text(stringResource(R.string.settings)) }
+    // A fresh hub status on request (pull down / "Refresh"; user action only, no background
+    // work): one Wi-Fi scan (Android allows 4 per 2 minutes) and, while the relay searches, a
+    // search now; the hub list reads the results again once the scan had time to finish.
+    val refresh = {
+        if (!scanning) {
+            scanning = true
+            if (!DeviceProbe(context).requestScan()) {
+                Toast.makeText(context, R.string.refresh_throttled, Toast.LENGTH_LONG).show()
+            }
+            if (state.phase == Phase.SEARCHING) RelayStateHolder.wakeSearch()
+            scope.launch {
+                delay(SCAN_WAIT_MS)
+                scanTick++
+                scanning = false
+            }
         }
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center,
-            modifier = Modifier.fillMaxWidth().padding(vertical = 18.dp),
+    }
+    PullToRefreshBox(isRefreshing = scanning, onRefresh = refresh, modifier = Modifier.fillMaxSize().safeDrawingPadding()) {
+        Column(
+            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Text(stringResource(R.string.toggle_label), style = MaterialTheme.typography.headlineSmall)
-            Spacer(Modifier.width(40.dp))
-            // Material switch at 2×: the one control of the app, easy to hit and to read.
-            Switch(
-                checked = enabled,
-                onCheckedChange = { on -> if (on) permissions.launch(relayPermissions()) else onToggle(false) },
-                enabled = enabled || hubs.isNotEmpty(),
-                modifier = Modifier.scale(2f),
-            )
-        }
-        Text(
-            statusText(state, enabled, hubs),
-            style = MaterialTheme.typography.titleMedium,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Text(
-            stringResource(R.string.shared_totals, formatData(state.sessionShared), formatData(usage.allTime)),
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        if (!settings.unlimited) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f))
+                TextButton(onClick = onSettings) { Text(stringResource(R.string.settings)) }
+            }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
+                modifier = Modifier.fillMaxWidth().padding(vertical = 18.dp),
+            ) {
+                Text(stringResource(R.string.toggle_label), style = MaterialTheme.typography.headlineSmall)
+                Spacer(Modifier.width(40.dp))
+                // Material switch at 2×: the one control of the app, easy to hit and to read.
+                Switch(
+                    checked = enabled,
+                    onCheckedChange = { on -> if (on) permissions.launch(relayPermissions()) else onToggle(false) },
+                    enabled = enabled || hubs.isNotEmpty(),
+                    modifier = Modifier.scale(2f),
+                )
+            }
             Text(
-                stringResource(
-                    R.string.limit_line, formatData(usage.used), formatData(settings.capMb * RelaySettings.BYTES_PER_MB),
-                    periodText(settings.period),
-                ),
-                style = MaterialTheme.typography.bodySmall,
+                statusText(state, enabled, hubs),
+                style = MaterialTheme.typography.titleMedium,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth(),
             )
-        }
-        UpdateBanner()
-        SetupCard()
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(stringResource(R.string.hubs), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-            if (!state.serviceRunning && hubs.isNotEmpty() && visible != null) {
-                TextButton(
-                    enabled = !scanning,
-                    onClick = {
-                        scanning = true
-                        if (!DeviceProbe(context).requestScan()) {
-                            Toast.makeText(context, R.string.refresh_throttled, Toast.LENGTH_LONG).show()
-                        }
-                        scope.launch {
-                            delay(SCAN_WAIT_MS)
-                            scanTick++
-                            scanning = false
-                        }
-                    },
-                ) { Text(stringResource(if (scanning) R.string.refreshing_hubs else R.string.refresh_hubs)) }
+            Text(
+                stringResource(R.string.shared_totals, formatData(state.sessionShared), formatData(usage.allTime)),
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            if (!settings.unlimited) {
+                Text(
+                    stringResource(
+                        R.string.limit_line, formatData(usage.used), formatData(settings.capMb * RelaySettings.BYTES_PER_MB),
+                        periodText(settings.period),
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
-            OutlinedButton(onClick = onAdd) { Text(stringResource(R.string.add_hub)) }
-        }
-        if (hubs.isEmpty()) Text(stringResource(R.string.no_hub))
-        if (hubs.isNotEmpty() && visible == null) LocationHint(scanTick)
-        // Online hubs first, then unknown range, offline last. With several online the friend
-        // picks the active one with a radio button (it becomes the chosen hub).
-        val states = hubs.associate { it.id to hubState(it, state, visible) }
-        val online = hubs.filter { states[it.id] in ONLINE }.sortedByDescending { it.lastSeen }
-        val rest = hubs.filter { states[it.id] !in ONLINE }
-            .sortedWith(compareBy<SavedHub> { states[it.id] == HubState.AWAY }.thenByDescending { it.lastSeen })
-        val active = online.firstOrNull { it.preferred }?.id
-            ?: online.firstOrNull { states[it.id] == HubState.CONNECTED || states[it.id] == HubState.CONNECTING }?.id
-        online.forEach { hub ->
-            HubCard(hub, states.getValue(hub.id), selected = if (online.size > 1) hub.id == active else null,
-                onSelect = { onChoose(hub.id) }) { onHub(hub.id) }
-        }
-        rest.forEach { hub -> HubCard(hub, states.getValue(hub.id)) { onHub(hub.id) } }
-        if (state.lastStop.isNotEmpty() && !enabled) {
-            Text(stringResource(R.string.stats_last_stop, state.lastStop), style = MaterialTheme.typography.bodySmall)
+            UpdateBanner()
+            SetupCard()
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(stringResource(R.string.hubs), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                if (!state.serviceRunning && hubs.isNotEmpty() && visible != null) {
+                    TextButton(enabled = !scanning, onClick = refresh) { Text(stringResource(if (scanning) R.string.refreshing_hubs else R.string.refresh_hubs)) }
+                }
+                OutlinedButton(onClick = onAdd) { Text(stringResource(R.string.add_hub)) }
+            }
+            if (hubs.isEmpty()) Text(stringResource(R.string.no_hub))
+            if (hubs.isNotEmpty() && visible == null) LocationHint(scanTick)
+            // Online hubs first, then unknown range, offline last. With several online the friend
+            // picks the active one with a radio button (it becomes the chosen hub).
+            val states = hubs.associate { it.id to hubState(it, state, visible) }
+            val online = hubs.filter { states[it.id] in ONLINE }.sortedByDescending { it.lastSeen }
+            val rest = hubs.filter { states[it.id] !in ONLINE }
+                .sortedWith(compareBy<SavedHub> { states[it.id] == HubState.AWAY }.thenByDescending { it.lastSeen })
+            val active = online.firstOrNull { it.preferred }?.id
+                ?: online.firstOrNull { states[it.id] == HubState.CONNECTED || states[it.id] == HubState.CONNECTING }?.id
+            online.forEach { hub ->
+                HubCard(hub, states.getValue(hub.id), selected = if (online.size > 1) hub.id == active else null,
+                    onSelect = { onChoose(hub.id) }) { onHub(hub.id) }
+            }
+            rest.forEach { hub -> HubCard(hub, states.getValue(hub.id)) { onHub(hub.id) } }
+            if (state.lastStop.isNotEmpty() && !enabled) {
+                Text(stringResource(R.string.stats_last_stop, state.lastStop), style = MaterialTheme.typography.bodySmall)
+            }
         }
     }
 }

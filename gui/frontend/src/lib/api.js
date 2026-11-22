@@ -96,7 +96,10 @@ export function enrollErrorText(err) {
     )
   }
   if (s.includes('no handshake response')) {
-    return 'Serwer nie odpowiada: kod mógł zostać już użyty, wygasnąć (ważny 24 h) albo zostać cofnięty, albo serwer nie działa.'
+    return (
+      'Serwer nie odpowiada. Spróbuj jeszcze raz tym samym kodem — jeśli serwer już przyjął ten hub, rejestracja ' +
+      'się dokończy. Kod mógł też wygasnąć (ważny 24 h) albo zostać cofnięty, albo serwer nie działa.'
+    )
   }
   if (s.includes('an enrollment is already running')) return 'Rejestracja już trwa.'
   return s

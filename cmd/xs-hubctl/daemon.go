@@ -156,6 +156,11 @@ func enrollViaDaemon(ctx context.Context, sock, code string) error {
 	if err := ipc.Call(ctx, sock, hub.MethodServerEnroll, hub.EnrollParams{Code: code}, &e); err != nil {
 		return err
 	}
+	if e.Pending {
+		fmt.Printf("switched to the new server as %s; it has not answered yet, the hub keeps trying with the code "+
+			"(xs-hubctl status: enroll_pending)\n", e.Name)
+		return nil
+	}
 	fmt.Printf("enrolled as %s, tunnel ip %s\n", e.Name, e.TunnelIP)
 	return nil
 }
