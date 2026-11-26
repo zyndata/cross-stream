@@ -3,6 +3,16 @@
 All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [0.11.1] - 2026-11-26
+
+### Fixed
+
+- **bond:** In-flight cap from the data RTT min; xs-hubctl paths diagnostics
+- **relay-app:** Unknown scan goes back to the last used hub
+- **bond:** Keep the bandwidth estimate through cellular delivery stalls
+- **bond:** ACK aggregation allowance while probing (extra_acked)
+- **bond:** No ACK aggregation allowance on TCP/WSS paths
+
 ## [0.11.0] - 2026-11-26
 
 ### Added

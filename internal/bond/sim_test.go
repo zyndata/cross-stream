@@ -49,15 +49,17 @@ type sim struct {
 // link is one direction of an emulated cellular link: rate, delay, random
 // loss, a tail-drop queue and an MTU.
 type link struct {
-	rate     float64 // bytes/s
-	delay    time.Duration
-	jitter   time.Duration
-	loss     float64
-	queueMax time.Duration // queue limit expressed as drain time
-	mtu      int           // outer bytes, 0 = no limit
-	burst    time.Duration // > 0: arrivals are released in batches every burst/2..burst (LTE-like)
-	stall    time.Duration // > 0: every 1–3 s delivery pauses for stall/2..stall, then releases at once
-	up       bool
+	rate      float64 // bytes/s
+	delay     time.Duration
+	jitter    time.Duration
+	loss      float64
+	queueMax  time.Duration // queue limit expressed as drain time
+	mtu       int           // outer bytes, 0 = no limit
+	burst     time.Duration // > 0: arrivals are released in batches every burst/2..burst (LTE-like)
+	stall     time.Duration // > 0: every 1–3 s delivery pauses for stall/2..stall, then releases at once
+	grant     time.Duration // > 0: datagrams above grantSmall wait this long more (LTE uplink grant)
+	grantIdle bool          // the grant wait also hits a datagram sent on an idle link
+	up        bool
 
 	nextBatch  time.Time
 	stallStart time.Time
@@ -68,16 +70,22 @@ type link struct {
 }
 
 type linkSpec struct {
-	mbps   float64
-	rtt    time.Duration
-	loss   float64
-	jitter time.Duration
-	mtu    int
-	queue  time.Duration // link buffer as drain time (default 150 ms)
-	burst  time.Duration // batch release period (0 = smooth)
-	bBurst time.Duration // b → a batch period if set (ACK direction of a download)
-	stall  time.Duration // a → b delivery stalls (see link.stall)
+	mbps      float64
+	rtt       time.Duration
+	loss      float64
+	jitter    time.Duration
+	mtu       int
+	queue     time.Duration // link buffer as drain time (default 150 ms)
+	burst     time.Duration // batch release period (0 = smooth)
+	bBurst    time.Duration // b → a batch period if set (ACK direction of a download)
+	stall     time.Duration // a → b delivery stalls (see link.stall)
+	grant     time.Duration // a → b uplink grant wait of data datagrams sent on a busy link (see link.grant)
+	grantIdle bool          // the grant wait also hits data sent on an idle link
 }
+
+// grantSmall is the largest datagram that rides an existing uplink grant
+// (PINGs, PONGs, ACKs): it waits for neither the grant nor the data ahead.
+const grantSmall = 200
 
 // node is one side: an engine plus its tick scheduling and delivery log.
 type node struct {
@@ -125,6 +133,7 @@ func newSimSeed(t *testing.T, specs []linkSpec, seed uint64) *sim {
 			s.b.out[id].burst = sp.bBurst
 		}
 		s.a.out[id].stall = sp.stall
+		s.a.out[id].grant, s.a.out[id].grantIdle = sp.grant, sp.grantIdle
 		s.a.e.AddPath(id, PathConfig{}, false)
 		s.b.e.AddPath(id, PathConfig{}, false)
 	}
@@ -208,6 +217,13 @@ func (n *node) transmit(id uint8, frames []wire.Frame) error {
 	if l.jitter > 0 {
 		arr = arr.Add(time.Duration(s.rng.Int64N(int64(l.jitter))))
 	}
+	if l.grant > 0 && size <= grantSmall {
+		s.at(arr, func() { n.arrive(l, id, size, plain) }) // not held behind data waiting for a grant
+		return nil
+	}
+	if l.grantIdle || start.After(s.now) { // idle: a lone datagram rides the standing grant
+		arr = arr.Add(l.grant)
+	}
 	arr = later(arr, l.lastArrival) // one link keeps FIFO order
 	if l.burst > 0 {
 		for l.nextBatch.Before(arr) {
@@ -232,22 +248,25 @@ func (n *node) transmit(id uint8, frames []wire.Frame) error {
 		l.lastArrival = later(l.lastArrival, arr)
 	}
 	l.lastArrival = arr
-	peer := n.peer
-	s.at(arr, func() {
-		if !l.up {
-			return
-		}
-		fs, err := wire.ParseFrames(plain)
-		if err != nil {
-			s.t.Fatalf("parse frames: %v", err)
-		}
-		rest := peer.e.Receive(id, size, fs)
-		if peer.frames != nil && len(rest) > 0 {
-			peer.frames(rest)
-		}
-		peer.poke()
-	})
+	s.at(arr, func() { n.arrive(l, id, size, plain) })
 	return nil
+}
+
+// arrive hands a datagram that crossed l to the peer engine.
+func (n *node) arrive(l *link, id uint8, size int, plain []byte) {
+	if !l.up {
+		return
+	}
+	fs, err := wire.ParseFrames(plain)
+	if err != nil {
+		n.s.t.Fatalf("parse frames: %v", err)
+	}
+	peer := n.peer
+	rest := peer.e.Receive(id, size, fs)
+	if peer.frames != nil && len(rest) > 0 {
+		peer.frames(rest)
+	}
+	peer.poke()
 }
 
 func (n *node) deliver(pkt []byte) {

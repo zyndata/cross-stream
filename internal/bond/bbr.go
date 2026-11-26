@@ -69,6 +69,51 @@ type bbr struct {
 	probeRTTDue  bool          // min RTT expired; the engine starts PROBE_RTT when no other path is in it
 	probeMin     time.Duration // lowest RTT seen since the path drained in PROBE_RTT
 	priorMode    bbrMode
+
+	// Windowed min of the data RTT (send → ACK of first transmissions): the
+	// RTT the BDP and the in-flight cap use. A PING is answered at once and
+	// rides small grants, a data packet waits for the uplink grant and the
+	// ACK interval: on LTE uploads the data RTT stayed ~2 × the ping min, so
+	// a cap of 2 × btlbw × ping min held one data RTT of the current rate,
+	// the rate could never grow and the cap sat at its floor (2026-11-26:
+	// S23 and modem at ~2.5 Mb/s each). BBR takes min_rtt from data ACKs too.
+	dataMin      time.Duration
+	dataMinAt    time.Time
+	dataProbeMin time.Duration // lowest data RTT since the path drained in PROBE_RTT
+
+	// ACK aggregation (Linux BBR extra_acked): bytes acked beyond btlbw × the
+	// time of an aggregation epoch, windowed max over 10 rounds, added to the
+	// in-flight cap. The receiver ACKs every AckEvery packets or AckInterval
+	// and an LTE uplink waits for grants only under load, so data RTT under
+	// load exceeded every idle min the cap was sized by (2026-11-26: the Dell
+	// modem crawled from 4 to 10 Mb/s in 7 s).
+	extraAcked    roundMax
+	ackEpochAt    time.Time
+	ackEpochAcked uint64
+}
+
+const (
+	ackEpochReset  = 1 << 20                // bytes: a long epoch starts over (Linux bbr_ack_epoch_acked_reset_thresh)
+	extraAckedTime = 100 * time.Millisecond // extra_acked is at most this long at btlbw (Linux bbr_extra_acked_max_us)
+)
+
+// onAcked updates the ACK aggregation estimate for acked bytes; cwnd is
+// the path's current in-flight cap.
+func (b *bbr) onAcked(now time.Time, acked, cwnd int) {
+	bw := b.bw()
+	if bw == 0 || acked <= 0 {
+		return
+	}
+	if b.ackEpochAt.IsZero() {
+		b.ackEpochAt = now
+	}
+	expected := uint64(float64(bw) * now.Sub(b.ackEpochAt).Seconds())
+	if b.ackEpochAcked <= expected || b.ackEpochAcked+uint64(acked) >= ackEpochReset {
+		b.ackEpochAcked, b.ackEpochAt, expected = 0, now, 0
+	}
+	b.ackEpochAcked += uint64(acked)
+	extra := min(b.ackEpochAcked-expected, uint64(cwnd), uint64(float64(bw)*extraAckedTime.Seconds()))
+	b.extraAcked.add(b.round, extra)
 }
 
 // onRTT feeds a path RTT sample (from PING/PONG). The min RTT filter expires
@@ -89,9 +134,31 @@ func (b *bbr) onRTT(now time.Time, rtt time.Duration) {
 	}
 }
 
+// onDataRTT feeds the RTT of an acked first transmission (dataMin). Like
+// the ping filter it expires after minRTTWindow and then asks for PROBE_RTT,
+// whose drained samples replace it: a sample taken under load includes the
+// queue and would inflate the in-flight cap.
+func (b *bbr) onDataRTT(now time.Time, rtt time.Duration) {
+	if b.mode == bbrProbeRTT && !b.probeRTTDone.IsZero() && (b.dataProbeMin == 0 || rtt < b.dataProbeMin) {
+		b.dataProbeMin = rtt
+	}
+	if b.dataMin == 0 || rtt <= b.dataMin {
+		b.dataMin, b.dataMinAt = rtt, now
+		return
+	}
+	if now.Sub(b.dataMinAt) > minRTTWindow && b.mode != bbrProbeRTT {
+		b.probeRTTDue = true
+	}
+}
+
+// bdpRTT is the RTT of the BDP: the data RTT min, never below the ping min
+// (the path's own round trip), or the ping min before any data sample.
+func (b *bbr) bdpRTT(minRTT time.Duration) time.Duration { return max(minRTT, b.dataMin) }
+
 // enterProbeRTT starts draining the path to measure its min RTT.
 func (b *bbr) enterProbeRTT() {
 	b.priorMode, b.mode, b.probeRTTDone, b.probeRTTDue, b.probeMin = b.mode, bbrProbeRTT, time.Time{}, false, 0
+	b.dataProbeMin = 0
 }
 
 // update advances PROBE_RTT. It returns true when the path just drained
@@ -112,6 +179,10 @@ func (b *bbr) update(now time.Time, inflight int) bool {
 			b.minRTT = b.probeMin
 		}
 		b.minRTTAt = now
+		if b.dataProbeMin > 0 {
+			b.dataMin = b.dataProbeMin
+		}
+		b.dataMinAt = now
 		b.mode = b.priorMode
 		if b.mode == bbrProbeBW {
 			b.cycle, b.cycleStart = 2, now
@@ -166,10 +237,11 @@ func (b *bbr) pacingRate(srtt time.Duration) float64 {
 }
 
 func (b *bbr) bdp(minRTT time.Duration) float64 {
-	if b.bw() == 0 || minRTT <= 0 {
+	rtt := b.bdpRTT(minRTT)
+	if b.bw() == 0 || rtt <= 0 {
 		return initialCwnd
 	}
-	return float64(b.bw()) * minRTT.Seconds()
+	return float64(b.bw()) * rtt.Seconds()
 }
 
 func (b *bbr) cwnd(minRTT time.Duration) int {
@@ -182,6 +254,9 @@ func (b *bbr) cwnd(minRTT time.Duration) int {
 		return initialCwnd
 	}
 	c := int(g * b.bdp(minRTT))
+	if b.mode == bbrStartup || (b.mode == bbrProbeBW && b.cycle == 0) {
+		c += int(b.extraAcked.get()) // only while probing up: a path at its rate keeps a short queue
+	}
 	if b.inflightHi > 0 {
 		c = min(c, b.inflightHi)
 	}
@@ -232,6 +307,15 @@ func (b *bbr) onLoss(now time.Time, size int, delivered uint64, minRTT, lossTime
 	}
 }
 
+// undoLoss takes back one loss of size bytes counted in the current round
+// (its late ACK came: spuriousLoss).
+func (b *bbr) undoLoss(size int) {
+	b.roundLost -= min(uint64(size), b.roundLost)
+	if b.roundLossEvents > 0 {
+		b.roundLossEvents--
+	}
+}
+
 // onRoundEnd applies the loss response of the round that just ended:
 // too much loss ends STARTUP and bounds the in-flight data (inflight_hi);
 // a loss-free round in the probing phase raises the bound again. It
@@ -274,6 +358,14 @@ func (b *bbr) onAck(now time.Time, rate float64, appLimited bool, pktDelivered, 
 	}
 	if rate > 0 && (!appLimited || uint64(rate) >= b.bw()) {
 		b.maxBW.add(b.round, uint64(rate))
+	} else if bw := b.bw(); appLimited && bw > 0 && 2*rate >= float64(bw) && b.roundLost == 0 && b.lossyRounds == 0 {
+		// A loss-free app-limited sample of a busy path (at least half the
+		// estimate) keeps the estimate fresh. Without it the window stood
+		// still while the path's traffic stayed just below its rate (20–30
+		// rounds), and then one low sample after a cellular stall, or two
+		// lossy rounds, expired it at once: 53 → 11 Mb/s, once to 0 (cap at
+		// its floor). Lossy rounds and paths whose rate fell still age it.
+		b.maxBW.add(b.round, bw)
 	}
 	switch b.mode {
 	case bbrStartup:

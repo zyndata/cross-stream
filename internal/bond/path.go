@@ -25,6 +25,7 @@ type sentPacket struct {
 	done     bool        // acked, lost or superseded
 	twin     *sentPacket // the other copy of a duplicated packet
 	isTwin   bool        // second copy: no rate samples
+	lostOn   *path       // re-send: the path the previous copy was declared lost on
 
 	// delivery rate sample state at send time
 	delivered     uint64
@@ -279,8 +280,9 @@ func (p *path) becomeAlive(now time.Time) {
 func (p *path) stats(now time.Time) PathStats {
 	return PathStats{
 		ID: p.id, State: p.state.String(), Priority: p.cfg.Priority.String(), Dir: p.cfg.Dir.String(),
-		SRTT: p.rtt.srtt, Jitter: p.rtt.rttvar, MinRTT: p.minRTTEst(), Loss: p.loss,
+		SRTT: p.rtt.srtt, Jitter: p.rtt.rttvar, MinRTT: p.minRTTEst(), BDPRTT: p.cc.bdpRTT(p.minRTTEst()), Loss: p.loss,
 		BtlBw: p.cc.bw(), Inflight: p.inflight, Cwnd: p.cc.cwnd(p.minRTTEst()),
+		InflightHi: p.cc.inflightHi, AppLimited: p.appLimitedUntil != 0,
 		CC: p.cc.mode.String(), Pacing: uint64(p.cc.pacingRate(p.srtt())), DataRTT: p.dataRTT.srtt,
 		TxBytes: p.txBytes, RxBytes: p.rxBytes, TxData: p.txData, RxData: p.rxData,
 		TxRate: p.txMeter.get(now), RxRate: p.rxMeter.get(now), MTU: p.mtu,

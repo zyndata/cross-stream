@@ -27,6 +27,9 @@ const usage = `usage: xs-hubctl [-dir path] [-socket path] <command>
   status                             hub mode, tunnel, hotspot clients and relays (JSON)
   relays                             paired relays and their state (JSON)
   events                             status as one JSON line per second (Ctrl-C stops)
+  paths [-every 1s] [-n count]       bonded paths' metrics as CSV, one line per path per sample:
+                                     rates, RTTs, in-flight cap and bound, app-limited, loss and
+                                     drop counters (upload diagnostics; Ctrl-C stops)
   hotspot [-ssid s] [-psk p] [-band a|bg] [-channel n] [-country CC]
                                      show the hotspot, or change it (restarts the AP)
   pair-qr [-no-qr]                   print the XSR1 relay pairing code (QR on a terminal)
@@ -114,6 +117,8 @@ func run(args []string) error {
 		return pairQRCmd(ctx, *sock, fs.Args()[1:])
 	case "forget":
 		return forgetCmd(ctx, *sock, fs.Args()[1:])
+	case "paths":
+		return pathsCmd(ctx, *sock, fs.Args()[1:])
 	case "path":
 		return pathCmd(ctx, *sock, fs.Args()[1:])
 	case "settings":

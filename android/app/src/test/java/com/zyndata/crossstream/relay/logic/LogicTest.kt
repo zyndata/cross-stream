@@ -278,7 +278,7 @@ class HubsTest {
         val cases = listOf(
             Case("chosen beats a stronger hub", both, emptyMap(), a, true),
             Case("chosen out of range: strongest", onlyB, emptyMap(), b, false),
-            Case("no scan: chosen, not the most recent", null, emptyMap(), a, true),
+            Case("no scan: the most recent, not the chosen", null, emptyMap(), b, false),
             Case("chosen cooling down: another hub", null, mapOf("a" to 200L), b, false),
         )
         for (cs in cases) {
@@ -287,6 +287,9 @@ class HubsTest {
         }
         assertFalse("already on the chosen hub", HubPicker.switchTo(hubs, "a", both, emptyMap(), 100))
         assertFalse("nothing chosen", HubPicker.switchTo(listOf(b), "b", null, emptyMap(), 100))
+        val aRecent = a.copy(lastSeen = 30)
+        assertEquals("no scan: the chosen hub when it is the most recent", aRecent,
+            HubPicker.pick(listOf(aRecent, b), null, emptyMap(), 100))
         assertEquals(true, SavedHub.fromJson(a.toJson()).preferred)
     }
 

@@ -122,7 +122,8 @@ func (l *link) limitReached() string {
 func (l *link) sendStats() error {
 	d := l.r.cfg.Device()
 	m := &control.Stats{BytesUp: l.r.up.Load(), BytesDown: l.r.down.Load(), Battery: d.Battery,
-		SignalDBm: d.SignalDBm, NetType: d.NetType, CellularOK: d.CellularOK, WifiRSSI: d.WifiRSSI}
+		SignalDBm: d.SignalDBm, NetType: d.NetType, CellularOK: d.CellularOK, WifiRSSI: d.WifiRSSI,
+		Dropped: l.r.dropped.Load()}
 	if u := l.up.Load(); u != nil {
 		if c, ok := u.conn.(transport.Counter); ok {
 			tc := c.TCPCounters()

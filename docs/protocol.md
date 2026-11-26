@@ -129,7 +129,7 @@ QR is regenerated every 10 min and after each successful pairing.
 | hello | R→H | `relay_name, carrier, pair_token (first time only), limits{max_priority (normal/secondary/backup), cap_mb, cap_period (session/day/month), reset_day, used_mb (in current period), over_cap (stop/throttle), throttle_kbps, battery_min}` |
 | welcome | H→R | `relay_id, path_id, server_ep, data_port`, `tcp_conns` (phase 20, optional: TCP connections for a `tcp://` server_ep, 0 = 1, max 8) |
 | reject | H→R | `reason` (bad token, forgotten, hub full) |
-| stats | R→H every 1 s | `bytes_up, bytes_down, battery, signal_dbm, net_type (lte/nr/...), cellular_ok (VALIDATED), wifi_rssi`; phase 20, optional: `tcp_conns` (live TCP connections), `tcp_retrans`, `tcp_sent` (cumulative segments over the connection set) |
+| stats | R→H every 1 s | `bytes_up, bytes_down, battery, signal_dbm, net_type (lte/nr/...), cellular_ok (VALIDATED), wifi_rssi`; phase 20, optional: `tcp_conns` (live TCP connections), `tcp_retrans`, `tcp_sent` (cumulative segments over the connection set); optional `dropped` (packets the relay dropped since it started: filters, limits, unknown sender) |
 | leaving | R→H | `reason` (limit, battery, user, no_cellular, no_data = not validated/captive) |
 | endpoint | H→R | `server_ep` URI (switch this path to another server endpoint / transport), `tcp_conns` (phase 20, optional). The endpoint in use with another `tcp_conns` only resizes the relay's connection set; anything else (including the same endpoint again) redials |
 

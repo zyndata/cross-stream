@@ -103,12 +103,14 @@ object HubPicker {
 
     /**
      * Whether a session with current should end to join the chosen hub instead: one is chosen,
-     * it is another hub, not cooling down and (when the scan is known) in range.
+     * it is another hub, not cooling down and a scan shows it. An unknown scan never ends a
+     * working session (2026-11-26: the S23 left the Dell for a switched-off chosen hub and came
+     * back 3 s later); "Switch now" still tries the chosen hub by hand.
      */
     fun switchTo(hubs: List<SavedHub>, current: String, scan: List<SeenAp>?, cooldownUntil: Map<String, Long>, nowMs: Long): Boolean {
         val chosen = hubs.firstOrNull { it.preferred } ?: return false
         return chosen.id != current && (cooldownUntil[chosen.id] ?: 0) <= nowMs &&
-            (scan == null || scan.any { matches(chosen, it) })
+            scan != null && scan.any { matches(chosen, it) }
     }
 
     /**
@@ -153,14 +155,17 @@ object HubPicker {
         hubs.filter { h -> scan.any { matches(h, it) } }.map { it.id }.toSet()
 
     /**
-     * The hub to join: the hub the friend chose when it is visible (or the scan is unknown),
-     * else the strongest visible saved hub; hubs cooling down are skipped.
-     * scan == null (no scan permission or results): the most recently used hub.
+     * The hub to join: the hub the friend chose when a scan shows it, else the strongest
+     * visible saved hub; hubs cooling down are skipped.
+     * scan == null (no scan permission or results): the most recently used hub, chosen or not.
+     * The chosen one used to win here: when the Dell's hotspot restarted, the S23 spent 42 s on
+     * a switched-off chosen hub before it went back to the Dell (2026-11-26). Choosing a hub
+     * switches to it by hand, so it is the most recent one until the friend uses another.
      */
     fun pick(hubs: List<SavedHub>, scan: List<SeenAp>?, cooldownUntil: Map<String, Long>, nowMs: Long): SavedHub? {
         val ok = hubs.filter { (cooldownUntil[it.id] ?: 0) <= nowMs }
         val chosen = ok.firstOrNull { it.preferred }
-        if (chosen != null && (scan == null || scan.any { matches(chosen, it) })) return chosen
+        if (chosen != null && scan != null && scan.any { matches(chosen, it) }) return chosen
         if (scan == null) return ok.maxByOrNull { it.lastSeen }
         return ok.mapNotNull { h -> scan.filter { matches(h, it) }.maxOfOrNull { it.rssi }?.let { h to it } }
             .maxByOrNull { it.second }?.first

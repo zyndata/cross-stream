@@ -135,10 +135,13 @@ type PathStats struct {
 	SRTT        time.Duration `json:"srtt"`
 	Jitter      time.Duration `json:"jitter"` // rttvar
 	MinRTT      time.Duration `json:"min_rtt"`
+	BDPRTT      time.Duration `json:"bdp_rtt"`      // RTT of the in-flight cap: data RTT min, at least min_rtt
 	Loss        float64       `json:"loss"`         // fraction of data packets lost (smoothed)
 	BtlBw       uint64        `json:"btlbw"`        // estimated bottleneck rate, bytes/s
 	Inflight    int           `json:"inflight"`     // bytes
 	Cwnd        int           `json:"cwnd"`         // in-flight cap, bytes
+	InflightHi  int           `json:"inflight_hi"`  // in-flight bound learned from loss, bytes (0 = none)
+	AppLimited  bool          `json:"app_limited"`  // in an app-limited period: samples cannot lower btlbw
 	CC          string        `json:"cc"`           // BBR-lite phase: startup, drain, probe_bw, probe_rtt
 	Pacing      uint64        `json:"pacing"`       // pacing rate, bytes/s
 	DataRTT     time.Duration `json:"data_rtt"`     // send → ACK of data packets (smoothed)

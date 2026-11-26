@@ -6,13 +6,16 @@ import (
 	"github.com/zyndata/cross-stream/internal/wire"
 )
 
+// onAckFrame handles the ACKed seqs oldest first: late ACKs of packets
+// declared lost in a delivery stall are credited (spuriousLoss) before a
+// newer ACK ends the round or takes a rate sample.
 func (e *Engine) onAckFrame(now time.Time, f *wire.Ack) {
-	e.onAck(now, f.Largest)
-	for i := range uint32(64) {
-		if f.Bitmap&(1<<i) != 0 {
-			e.onAck(now, f.Largest-1-i)
+	for i := uint32(64); i > 0; i-- {
+		if f.Bitmap&(1<<(i-1)) != 0 {
+			e.onAck(now, f.Largest-i)
 		}
 	}
+	e.onAck(now, f.Largest)
 }
 
 func (e *Engine) onAck(now time.Time, seq uint32) {
@@ -21,6 +24,10 @@ func (e *Engine) onAck(now time.Time, seq uint32) {
 		return
 	}
 	delete(e.unacked, seq)
+	if sp.lostOn != nil && (sp.sent.IsZero() || now.Sub(sp.sent) < sp.path.cc.bdpRTT(sp.path.minRTTEst())) {
+		// Too early for the re-send: the copy declared lost arrived after all.
+		sp.lostOn.spuriousLoss(sp.size0())
+	}
 	if sp.done || sp.sent.IsZero() { // waiting for a re-send: nothing in flight
 		sp.done = true
 		return
@@ -50,6 +57,23 @@ func (e *Engine) onAck(now time.Time, seq uint32) {
 	}
 }
 
+// size0 is the outer size of the packet's copies (sp.size is set on send).
+func (sp *sentPacket) size0() int { return IPOverhead + len(sp.pkt) }
+
+// spuriousLoss undoes a loss declared on p for a packet whose late ACK came
+// (Eifel-like: the ACK came before the re-send could have arrived). A
+// cellular delivery stall made every packet in flight "lost"; without the
+// credit the first rate sample after the stall missed those bytes, sank to a
+// fraction of the rate and replaced the bandwidth window's old maximum
+// (2026-11-26: S23 49.9 → 3.1 Mb/s in one sample).
+func (p *path) spuriousLoss(size int) {
+	p.delivered += uint64(size)
+	if p.winLost > 0 {
+		p.winLost--
+	}
+	p.cc.undoLoss(size)
+}
+
 // noteAckProgress restarts p's unacked-data clock after an ACK.
 func (p *path) noteAckProgress(now time.Time) {
 	p.lastAckProgress = now
@@ -72,12 +96,20 @@ func (e *Engine) sample(now time.Time, p *path, sp *sentPacket, minRTT time.Dura
 	rtt := now.Sub(sp.sent)
 	p.dataRTT.sample(rtt)
 	p.latestDataRTT = rtt
+	p.cc.onDataRTT(now, rtt)
 	interval := max(sp.sent.Sub(sp.firstSent), now.Sub(sp.deliveredTime))
 	var rate float64
 	if interval >= minRTT/2 && interval > 0 {
 		rate = float64(p.delivered-sp.delivered) / interval.Seconds()
 	}
 	p.cc.onAck(now, rate, sp.appLimited, sp.delivered, p.delivered, p.inflight, minRTT)
+	if !p.stream {
+		// Not on TCP/WSS paths: a loss stalls the TCP connection and its ACKs
+		// come in bursts, so the aggregation allowance pushed more data into
+		// full send queues; it spilled onto the path's other connections
+		// (reordered) and e2e tcploss fell to 10-13 Mb/s (without it 15-16).
+		p.cc.onAcked(now, sp.size, p.cc.cwnd(minRTT))
+	}
 	if !p.hasAcked || sp.num > p.largestAcked {
 		p.largestAcked, p.hasAcked = sp.num, true
 	}
@@ -157,7 +189,7 @@ func (e *Engine) lose(now time.Time, sp *sentPacket) {
 		delete(e.unacked, sp.seq)
 		return
 	}
-	r := &sentPacket{seq: sp.seq, pkt: sp.pkt, first: sp.first, attempts: sp.attempts + 1, path: p}
+	r := &sentPacket{seq: sp.seq, pkt: sp.pkt, first: sp.first, attempts: sp.attempts + 1, path: p, lostOn: p}
 	e.unacked[sp.seq] = r
 	e.rtx = append(e.rtx, r)
 	p.retrans++

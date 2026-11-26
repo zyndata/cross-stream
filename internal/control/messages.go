@@ -150,6 +150,9 @@ type Stats struct {
 	TCPConns   int    `json:"tcp_conns,omitempty"`
 	TCPRetrans uint64 `json:"tcp_retrans,omitempty"`
 	TCPSent    uint64 `json:"tcp_sent,omitempty"`
+	// Dropped: packets the relay dropped (filters, limits, unknown sender;
+	// cumulative since the relay started) — a hub-side upload diagnostic.
+	Dropped uint64 `json:"dropped,omitempty"`
 }
 
 // Leaving announces that the relay stops (R→H).

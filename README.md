@@ -10,7 +10,7 @@ self-hosted, end-to-end encrypted, shared as a Wi-Fi hotspot.**
 ![Platforms](https://img.shields.io/badge/hub-Linux%20%7C%20Windows-informational)
 ![Relay](https://img.shields.io/badge/relay-Android%2010%2B-green)
 
-> **Status:** beta — latest release `v0.11.0`. The field test (real carriers, a day
+> **Status:** beta — latest release `v0.11.1`. The field test (real carriers, a day
 > away from home) is still in progress; `v1.0.0` follows it. Everything below works and is
 > tested in the Docker test environment, and most of it on real phones and laptops —
 > see [Status and limitations](#status-and-limitations) for what is not yet tried on hardware.
@@ -334,7 +334,9 @@ Settings a friend controls (the hub cannot override them): data limit per
 session / day / month (stop or slow down when reached), battery threshold (default 20 %),
 how this hub may use the phone (normal / only when needed / only as backup), start on boot.
 The app remembers several hubs (rename them on the phone: tap a hub → *Rename*) and connects by
-itself to the chosen one or else the strongest one in range; *Switch to … now* moves to the chosen hub at once.
+itself to the chosen one or else the strongest one in range; when Android gives it no Wi-Fi scan
+(location off or not allowed) it goes back to the hub it used last. *Switch to … now* moves to the
+chosen hub at once.
 Pull the main screen down to refresh which hubs are in range right away (Android allows a few
 Wi-Fi scans per two minutes; after that the last scan is shown).
 App language: English or Polish.
@@ -355,6 +357,7 @@ xs-hubctl relays                          # paired phones and their state
 xs-hubctl path "Anna S23" -priority backup -cap-mb 2000
 xs-hubctl settings -mode min_latency      # or max_throughput; -redundancy off|auto|on; -pep on|off
 xs-hubctl speedtest -all                  # raw capacity of each phone (uses their data!)
+xs-hubctl paths -every 500ms > paths.csv  # per-path rates, RTTs and limits while you test
 xs-hubctl bypass set netflix.com 203.0.113.0/24   # leave through a phone's own IP
 xs-hubctl hotspot -ssid MyHotspot -psk "easy to type" -band a
 xs-hubctl logs -o hub-log.txt             # redacted log, safe to share
@@ -431,7 +434,8 @@ when a release notes a protocol change.
 Galaxy S23-series phones on LTE/5G plus the laptop's SIM modem; server on Ubuntu Server 24.04
 with Docker and as a Home Assistant app (amd64). Example measurements at home (one phone + one
 LTE modem, server behind 100 Mb/s upload): 27 Mb/s bonded without and 72 Mb/s with the TCP
-accelerator; plain TCP to the server bonded 2.4–2.6× the best single link. Your results depend
+accelerator; plain TCP to the server bonded 2.4–2.6× the best single link; upload (one TCP
+transfer from the hub laptop, `v0.11.1`) 61–63 Mb/s bonded, about 44 of it on the phone. Your results depend
 on coverage and carriers.
 
 **Tested only in the Docker test environment so far:** DIRECT fallback with real phones,
@@ -483,6 +487,21 @@ Layout: [docs/repo-structure.md](docs/repo-structure.md). Test environment:
 ## Changelog
 
 Highlights of each release, newest first. Every change: [CHANGELOG.md](CHANGELOG.md).
+
+### v0.11.1 — 2026-11-26
+
+- Faster upload: a bonded upload over LTE no longer crawls at a few Mb/s per link (the links'
+  in-flight limit was sized by the ping round trip, while data waits longer for the uplink).
+  At home, one phone + SIM modem, one TCP upload: 14 → 61–63 Mb/s.
+- Steadier links: a short delivery pause on a cellular link no longer drops its speed estimate
+  to a fraction for seconds.
+- Downloads on a TCP/WebSocket link with loss: one connection is about 2.5× faster (test
+  environment, 2 % loss: 5 → 12–13 Mb/s), several connections a little faster too.
+- Relay app: without a Wi-Fi scan (location off or not allowed) the phone goes back to the hub
+  it used last instead of waiting on a chosen hub that is switched off.
+- New `xs-hubctl paths`: each link's rates, round trips and limits as CSV, to see what slows a link.
+- **Upgrade:** no special order (protocol unchanged). Update the server too (Home Assistant:
+  *Update*): downloads are paced by the server.
 
 ### v0.11.0 — 2026-11-26
 
