@@ -17,9 +17,9 @@ file next to `docker-compose.yml` (git-ignored). The important one:
 - `XS_SERVER_LISTEN_PORTS` — UDP ports (default `51900,443`).
 - Tunnel port (`public_port` in `data/server.yaml`): the port hubs dial when the router maps
   another public port to the server's 51900, e.g. router `51901` → server `51900`. Default:
-  the listen port. Change it with `xs-ctl tunnel-port 51901` or in the panel (**Serwer** →
-  **Port tunelu**): both write `public_port` into `data/server.yaml`, the only place it is
-  kept, and the panel shows "Wymagany restart" until `xs-ctl restart` (or its button): the
+  the listen port. Change it with `xs-ctl tunnel-port 51901` or in the panel (**Server** →
+  **Tunnel port**): both write `public_port` into `data/server.yaml`, the only place it is
+  kept, and the panel shows "Server restart required" until `xs-ctl restart` (or its button): the
   server exits and the compose `restart: unless-stopped` policy starts it again.
   `XS_SERVER_PUBLIC_PORT` overrides the file (then the panel shows it read-only).
   Enrollment codes carry the port: after a change, hubs enrolled before must enroll again

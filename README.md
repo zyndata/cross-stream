@@ -231,15 +231,15 @@ and changes it there:
 | Docker | `public_port` in `data/server.yaml` (or `XS_SERVER_PUBLIC_PORT`, then read-only) | the web panel (*Server* → *Tunnel port*), `xs-ctl tunnel-port 51901`, or the file |
 | Home Assistant | the app's *Network* section (`51900/udp` and `51900/tcp`, same port) | that section, the web panel or `xs-ctl tunnel-port 51901` |
 
-A new port applies after a **restart**: until then the web panel shows *Wymagany restart*
+A new port applies after a **restart**: until then the web panel shows *Server restart required*
 (restart required) on every page, with a button that restarts the server (`xs-ctl restart`
 does the same). Forward the new port (UDP and TCP) on your router to the server. With Docker
 the router must translate it to the server's 51900, or change the published ports
 ([details](deploy/server/README.md)).
 
 > **Changing it after hubs are enrolled:** each hub keeps the port from its enrollment code and
-> can no longer connect. The server log, `xs-ctl list` and the panel (*Huby*, "zarejestruj
-> ponownie") name those hubs. Remove each one and enroll it again with a new code
+> can no longer connect. The server log, `xs-ctl list` and the panel (*Hubs*, "enroll
+> again") name those hubs. Remove each one and enroll it again with a new code
 > (`xs-ctl revoke <name>`, `xs-ctl enroll <name>`, paste the code in the hub). Relay phones need
 > nothing: they follow their hub. With a server built after v0.10.0 removing is optional: a new
 > code pasted into an enrolled hub moves it to the code's name and port.

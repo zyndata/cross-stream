@@ -32,7 +32,8 @@ Turn on **Start on boot** and **Watchdog**, then start the app. The log should s
 
 ## 4. Enroll a hub
 
-Panel (Polish UI) → **Huby** → **Dodaj hub**, type a name, copy the one-time code. On the hub:
+Panel (English or Polish: the switch in its header; *Automatic* follows your Home Assistant
+language) → **Hubs** → **Add hub**, type a name, copy the one-time code. On the hub:
 `xs-hubctl enroll <code>` (or paste it in the hub app). The hub appears online with
 its paths within seconds.
 
@@ -40,16 +41,16 @@ its paths within seconds.
 
 Hubs connect to port **51900** by default. The port lives in one place only: the app's
 **Network** section (`51900/udp` and `51900/tcp`, keep both the same). Change it there, or in
-the panel (**Serwer** → **Port tunelu** → **Zmień port**), which writes the same Network
+the panel (**Server** → **Tunnel port** → **Change port**), which writes the same Network
 mapping. Either way:
 
-- It takes effect after a restart. The panel shows **Wymagany restart** (restart required) on
+- It takes effect after a restart. The panel shows **Server restart required** on
   every page with a button that restarts the app; the HA Network section asks by itself.
 - Forward the new port (UDP and TCP) on your router to the Home Assistant host.
 - Best chosen before the first hub enrolls. **Hubs keep the port from their enrollment
-  code**: after a change each one enrolled before must enroll again. The panel's **Huby**
-  list marks them "zarejestruj ponownie" (the log names them too). For each: **Usuń**
-  (remove), **Dodaj hub** with the same name, paste the new code in the hub. Relay phones
+  code**: after a change each one enrolled before must enroll again. The panel's **Hubs**
+  list marks them "enroll again" (the log names them too). For each: **Delete**,
+  **Add hub** with the same name, paste the new code in the hub. Relay phones
   need nothing.
 
 ## Backups
