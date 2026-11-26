@@ -16,6 +16,7 @@
   import UpdateBanner from './components/UpdateBanner.svelte'
   import UpdateConfirm from './components/UpdateConfirm.svelte'
   import { upd, startUpdates } from './lib/update.svelte.js'
+  import { t, applyLang } from './i18n/i18n.svelte.js'
 
   let view = $state({ state: 'daemon', relays: [], uplinks: [], history: [] })
   let tab = $state('main')
@@ -31,6 +32,7 @@
   })
 
   onMount(() => {
+    api.language().then(applyLang).catch(() => {})
     api.current().then((v) => (view = v)).catch(() => {})
     const offView = onView((v) => (view = v))
     const offClose = onCloseAsk(() => (closing = true))
@@ -56,15 +58,15 @@
     {#if view.hub}<span class="muted">· {view.hub}</span>{/if}
   </div>
   {#if view.state === 'ok'}
-    <span class="badge {modeClass[view.mode] ?? 'bad'}">{modeLabel[view.mode] ?? view.mode}</span>
-    <span class="stat" title="Urządzenia połączone z hotspotem">Klienci: <b>{view.clients}</b></span>
+    <span class="badge {modeClass[view.mode] ?? 'bad'}">{modeLabel(view.mode)}</span>
+    <span class="stat" title={t('app.clientsHint')}>{t('app.clients')} <b>{view.clients}</b></span>
     <span class="stat"><span class="up">↑ {mbps(view.up_mbps)}</span> <span class="down">↓ {mbps(view.down_mbps)}</span></span>
   {/if}
   {#if view.state === 'ok'}
     <nav>
-      <button class:active={tab === 'main'} onclick={() => (tab = 'main')}>Panel</button>
-      <button class:active={tab === 'thanks'} onclick={() => (tab = 'thanks')}>Statystyki</button>
-      <button class:active={tab === 'settings'} onclick={() => (tab = 'settings')}>Ustawienia</button>
+      <button class:active={tab === 'main'} onclick={() => (tab = 'main')}>{t('app.tab.main')}</button>
+      <button class:active={tab === 'thanks'} onclick={() => (tab = 'thanks')}>{t('app.tab.stats')}</button>
+      <button class:active={tab === 'settings'} onclick={() => (tab = 'settings')}>{t('app.tab.settings')}</button>
     </nav>
   {/if}
 </header>
@@ -76,26 +78,24 @@
   {:else}
     {#if view.mode === 'DIRECT'}
       <div class="banner warn">
-        <b>Tryb bezpośredni — brak tunelu do serwera.</b>
-        Ruch wychodzi z adresów IP telefonów. Telefony i ich operatorzy widzą, z jakimi adresami się łączysz,
-        a strony mogą widzieć różne adresy IP w jednej sesji. Używaj tylko szyfrowanych połączeń (HTTPS).
-        {#if view.direct?.draining}<br />Kończenie starych połączeń po powrocie tunelu…{/if}
+        <b>{t('app.direct.title')}</b>
+        {t('app.direct.body')}
+        {#if view.direct?.draining}<br />{t('app.direct.draining')}{/if}
       </div>
     {/if}
     {#if view.enroll_pending}
       <div class="banner warn">
-        <b>Czekam na odpowiedź nowego serwera.</b>
-        Hub przełączył się na serwer z nowego kodu i ponawia rejestrację przez telefony, dopóki serwer nie odpowie.
-        Jeśli to trwa długo, sprawdź, czy serwer działa i czy kod nie wygasł (ważny 24 h).
+        <b>{t('app.pending.title')}</b>
+        {t('app.pending.body')}
       </div>
     {/if}
     {#if !view.enrolled}
       <div class="banner warn">
-        Hub nie jest zarejestrowany na serwerze.
-        <button onclick={() => (enrolling = true)}>Zarejestruj</button>
+        {t('app.notEnrolled')}
+        <button onclick={() => (enrolling = true)}>{t('enroll.button')}</button>
       </div>
     {:else if view.tunnel_error}
-      <div class="banner bad">Tunel: {view.tunnel_error}</div>
+      <div class="banner bad">{t('app.tunnelError', { error: view.tunnel_error })}</div>
     {/if}
     {#each view.warnings ?? [] as w}
       <div class="banner warn">{w}</div>

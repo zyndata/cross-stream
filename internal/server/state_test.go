@@ -223,3 +223,73 @@ func TestFreeIPPoolFull(t *testing.T) {
 		t.Fatalf("full pool: %v", err)
 	}
 }
+
+func TestStateEnrollKnown(t *testing.T) {
+	tests := []struct {
+		name     string
+		run      func(s *State, clk *clock, k [crypto.KeyLen]byte, used enroll.Token) (HubRecord, error)
+		want     error
+		wantName string
+		wantPort int
+	}{
+		{"new code renames, takes the current port", func(s *State, _ *clock, k [crypto.KeyLen]byte, _ enroll.Token) (HubRecord, error) {
+			tok := newToken(t)
+			if err := s.AddToken("b", tok, time.Hour); err != nil {
+				return HubRecord{}, err
+			}
+			if _, err := s.SetTunnelPort(51901); err != nil {
+				return HubRecord{}, err
+			}
+			if h, err := s.EnrollKnown(tok, k); err != nil || h.Name != "b" {
+				return h, err
+			}
+			return s.EnrollKnown(tok, k) // the hub repeats the code: consumed now
+		}, enroll.ErrTokenInvalid, "b", 51901},
+		{"used code ignored", func(s *State, _ *clock, k [crypto.KeyLen]byte, used enroll.Token) (HubRecord, error) {
+			return s.EnrollKnown(used, k)
+		}, enroll.ErrTokenInvalid, "a", 51900},
+		{"expired code ignored", func(s *State, clk *clock, k [crypto.KeyLen]byte, _ enroll.Token) (HubRecord, error) {
+			tok := newToken(t)
+			if err := s.AddToken("b", tok, time.Minute); err != nil {
+				return HubRecord{}, err
+			}
+			clk.t = clk.t.Add(time.Minute)
+			return s.EnrollKnown(tok, k)
+		}, enroll.ErrTokenExpired, "a", 51900},
+		{"unknown key", func(s *State, _ *clock, _ [crypto.KeyLen]byte, _ enroll.Token) (HubRecord, error) {
+			tok := newToken(t)
+			if err := s.AddToken("b", tok, time.Hour); err != nil {
+				return HubRecord{}, err
+			}
+			return s.EnrollKnown(tok, newKey(t))
+		}, ErrHubNotFound, "a", 51900},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			s, clk, path := openState(t)
+			if _, err := s.SetTunnelPort(51900); err != nil {
+				t.Fatal(err)
+			}
+			k, used := newKey(t), newToken(t)
+			if err := s.AddToken("a", used, time.Hour); err != nil {
+				t.Fatal(err)
+			}
+			first, err := s.Enroll(used, k)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := tc.run(s, clk, k, used); !errors.Is(err, tc.want) {
+				t.Fatalf("err %v, want %v", err, tc.want)
+			}
+			s2, err := OpenState(path, clk.now)
+			if err != nil {
+				t.Fatal(err)
+			}
+			hubs := s2.Hubs()
+			if len(hubs) != 1 || hubs[0].Name != tc.wantName || hubs[0].Port != tc.wantPort ||
+				hubs[0].TunnelIP != first.TunnelIP || hubs[0].PublicKey != first.PublicKey {
+				t.Fatalf("hubs after reopen %+v, want %q port %d", hubs, tc.wantName, tc.wantPort)
+			}
+		})
+	}
+}

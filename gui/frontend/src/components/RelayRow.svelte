@@ -2,22 +2,15 @@
   import { api, errorText } from '../lib/api.js'
   import { mbps, megabytes, ms, netLabel, lastReason, ago } from '../lib/fmt.js'
   import ConfirmDialog from './ConfirmDialog.svelte'
+  import { t, num } from '../i18n/i18n.svelte.js'
 
   let { rv, notify } = $props()
   let asking = $state(false)
 
-  const priorities = [
-    ['normal', 'główny'],
-    ['secondary', 'dodatkowy'],
-    ['backup', 'zapasowy'],
-  ]
-  const capRank = $derived(Math.max(0, priorities.findIndex(([v]) => v === rv.max_priority)))
-  const directions = [
-    ['on', 'wł.'],
-    ['backup_only', 'awaryjnie'],
-    ['off', 'wył.'],
-  ]
-  const pathState = { alive: 'aktywny', suspect: 'niepewny', sleeping: 'uśpiony', dead: 'brak ścieżki' }
+  const priorities = ['normal', 'secondary', 'backup']
+  const capRank = $derived(Math.max(0, priorities.indexOf(rv.max_priority)))
+  const directions = ['on', 'backup_only', 'off']
+  const pathStates = ['alive', 'suspect', 'sleeping', 'dead']
 
   async function set(params, what, el, shown) {
     try {
@@ -34,17 +27,17 @@
   function setNumber(e, key, what) {
     const v = e.currentTarget.value === '' ? 0 : Number(e.currentTarget.value)
     if (!Number.isInteger(v) || v < 0 || v > 4294967295) {
-      notify('Podaj liczbę całkowitą ≥ 0', true)
+      notify(t('relay.intError'), true)
       return
     }
-    set({ [key]: v }, v ? `${what} ${v}` : `${what} wyłączony`, e.currentTarget, rv[key] || '')
+    set({ [key]: v }, v ? `${what} ${v}` : t('relay.limitOff', { what }), e.currentTarget, rv[key] || '')
   }
 
   async function forget() {
     asking = false
     try {
       await api.forget(rv.id)
-      notify(`${rv.name} usunięty — aby wrócił, sparuj go ponownie`)
+      notify(t('relay.forgotten', { name: rv.name }))
     } catch (e) {
       notify(errorText(e), true)
     }
@@ -63,24 +56,24 @@
   </td>
   <td class="state">
     {#if rv.connected}
-      <span class="dot ok"></span>{pathState[rv.path_state] ?? 'połączony'}
-      {#if rv.direct_flows}<span class="muted small"> · {rv.direct_flows} poł. bezpośr.</span>{/if}
-      {#if rv.capped}<div class="chip bad">Limit danych osiągnięty</div>{/if}
+      <span class="dot ok"></span>{pathStates.includes(rv.path_state) ? t('relay.path.' + rv.path_state) : t('relay.connected')}
+      {#if rv.direct_flows}<span class="muted small"> · {t('relay.directFlows', { n: rv.direct_flows })}</span>{/if}
+      {#if rv.capped}<div class="chip bad">{t('relay.capped')}</div>{/if}
       {#if !rv.cellular_ok}
-        <div class="chip bad" title="Telefon zgłasza, że jego dane komórkowe nie działają">Brak danych komórkowych</div>
+        <div class="chip bad" title={t('relay.noCellHint')}>{t('relay.noCell')}</div>
       {/if}
       {#if rv.weak_wifi}
-        <div class="chip warn" title="Wi-Fi telefon ↔ hub: {rv.wifi_rssi} dBm. Przybliż telefon do laptopa.">
-          Słaby Wi-Fi: bliżej huba
+        <div class="chip warn" title={t('relay.weakWifiHint', { dbm: rv.wifi_rssi })}>
+          {t('relay.weakWifi')}
         </div>
       {/if}
       {#if rv.weak_cell}
-        <div class="chip warn" title="Słaby sygnał lub duże straty. Poproś o przeniesienie telefonu (okno, wyżej).">
-          Słaby zasięg: przenieś tel.
+        <div class="chip warn" title={t('relay.weakCellHint')}>
+          {t('relay.weakCell')}
         </div>
       {/if}
     {:else}
-      <span class="dot"></span>rozłączony
+      <span class="dot"></span>{t('relay.disconnected')}
       {#if rv.last_reason}
         <div class="muted small">{lastReason(rv.last_reason)}, {ago(rv.last_seen)}</div>
       {/if}
@@ -89,7 +82,7 @@
   <td>
     {#if rv.connected && rv.transport}
       <span class:chip={rv.transport !== 'udp'} class:warn={rv.transport !== 'udp'}
-        title={rv.transport === 'udp' ? 'UDP' : 'Operator blokuje UDP: tunel idzie przez ' + rv.transport.toUpperCase() + ' (wolniej)'}>
+        title={rv.transport === 'udp' ? 'UDP' : t('relay.udpBlocked', { via: rv.transport.toUpperCase() })}>
         {rv.transport.toUpperCase()}
       </span>
     {:else}—{/if}
@@ -102,52 +95,52 @@
   <td class="num">
     {#if rv.has_path}
       {ms(rv.rtt_ms)} · {ms(rv.jitter_ms)}<br />
-      <span class:lossy={rv.loss_pct > 5}>{rv.loss_pct.toFixed(1)}%</span>
+      <span class:lossy={rv.loss_pct > 5}>{num(rv.loss_pct, 1)}%</span>
     {:else}—{/if}
   </td>
   <td class="num">
     {megabytes(rv.used_mb)}
-    {#if rv.cap_mb}<div class="muted small">limit: {megabytes(rv.cap_used_mb)} / {megabytes(rv.cap_mb)}</div>{/if}
+    {#if rv.cap_mb}<div class="muted small">{t('relay.capUsed', { used: megabytes(rv.cap_used_mb), cap: megabytes(rv.cap_mb) })}</div>{/if}
   </td>
   <td>
-    <select value={rv.priority} onchange={(e) => set({ priority: e.currentTarget.value }, 'priorytet zmieniony', e.currentTarget, rv.priority)}>
-      {#each priorities as [v, label], i}<option value={v} disabled={i < capRank}>{label}</option>{/each}
+    <select value={rv.priority} onchange={(e) => set({ priority: e.currentTarget.value }, t('relay.prioChanged'), e.currentTarget, rv.priority)}>
+      {#each priorities as v, i}<option value={v} disabled={i < capRank}>{t('prio.' + v)}</option>{/each}
     </select>
     {#if capRank > 0}
-      <span class="lock" title={`Właściciel telefonu pozwala najwyżej na: ${priorities[capRank][1]}`}>🔒</span>
+      <span class="lock" title={t('relay.prioCap', { prio: t('prio.' + priorities[capRank]) })}>🔒</span>
     {/if}
   </td>
   <td>
-    <select value={rv.up} onchange={(e) => set({ up: e.currentTarget.value }, 'wysyłanie zmienione', e.currentTarget, rv.up)}>
-      {#each directions as [v, label]}<option value={v}>{label}</option>{/each}
+    <select value={rv.up} onchange={(e) => set({ up: e.currentTarget.value }, t('relay.upChanged'), e.currentTarget, rv.up)}>
+      {#each directions as v}<option value={v}>{t('dir.' + v)}</option>{/each}
     </select>
   </td>
   <td>
-    <select value={rv.down} onchange={(e) => set({ down: e.currentTarget.value }, 'pobieranie zmienione', e.currentTarget, rv.down)}>
-      {#each directions as [v, label]}<option value={v}>{label}</option>{/each}
+    <select value={rv.down} onchange={(e) => set({ down: e.currentTarget.value }, t('relay.downChanged'), e.currentTarget, rv.down)}>
+      {#each directions as v}<option value={v}>{t('dir.' + v)}</option>{/each}
     </select>
   </td>
   <td>
-    <input type="number" min="0" placeholder="bez" value={rv.rate_kbps || ''}
-      onchange={(e) => setNumber(e, 'rate_kbps', 'limit prędkości kb/s')} />
+    <input type="number" min="0" placeholder={t('relay.none')} value={rv.rate_kbps || ''}
+      onchange={(e) => setNumber(e, 'rate_kbps', t('relay.rateLimit'))} />
   </td>
   <td>
-    <input type="number" min="0" placeholder="bez" value={rv.cap_mb || ''}
-      onchange={(e) => setNumber(e, 'cap_mb', 'limit danych MB')} />
+    <input type="number" min="0" placeholder={t('relay.none')} value={rv.cap_mb || ''}
+      onchange={(e) => setNumber(e, 'cap_mb', t('relay.dataLimit'))} />
   </td>
   <td>
-    <button class="danger" onclick={() => (asking = true)}>Usuń</button>
+    <button class="danger" onclick={() => (asking = true)}>{t('common.delete')}</button>
     {#if asking}
-      <ConfirmDialog title="Usunąć telefon „{rv.name}”?" yes="Tak, usuń" no="Nie" danger
+      <ConfirmDialog title={t('relay.forgetAsk', { name: rv.name })} yes={t('common.deleteYes')} no={t('common.no')} danger
         onyes={forget} onno={() => (asking = false)}>
         <p>
-          {rv.carrier || 'Operator nieznany'} · {rv.connected ? 'połączony teraz' : 'rozłączony'}
-          · zużyte w tej sesji: {megabytes(rv.used_mb)}
+          {rv.carrier || t('relay.carrierUnknown')} · {rv.connected ? t('relay.connectedNow') : t('relay.disconnected')}
+          · {t('relay.usedSession', { mb: megabytes(rv.used_mb) })}
         </p>
         <ul>
-          <li>Hub rozłączy telefon i zapomni go — przestanie przez niego przesyłać dane.</li>
-          <li>Ustawienia telefonu (priorytet, kierunki, limity) zostaną usunięte.</li>
-          <li>Żeby znów go używać, trzeba zeskanować nowy kod QR w aplikacji CrossStream Relay.</li>
+          <li>{t('relay.forget1')}</li>
+          <li>{t('relay.forget2')}</li>
+          <li>{t('relay.forget3')}</li>
         </ul>
       </ConfirmDialog>
     {/if}

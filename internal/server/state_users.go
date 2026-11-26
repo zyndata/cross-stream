@@ -6,6 +6,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/zyndata/cross-stream/internal/crypto"
 	"github.com/zyndata/cross-stream/internal/enroll"
 	"github.com/zyndata/cross-stream/internal/server/admin"
 )
@@ -37,6 +38,47 @@ func (s *State) Rename(name, newName string) error {
 		s.hubs[newName] = h
 		return func() { delete(s.hubs, newName); s.hubs[name] = hub }
 	})
+}
+
+// EnrollKnown applies an enrollment code sent by a key that is already
+// enrolled (the hub was enrolled again with a new code without being
+// removed first): the code is consumed and the hub takes its name and the
+// current tunnel port; key and tunnel IP stay. It returns the record as it
+// is afterwards. An unknown or used code (enroll.ErrTokenInvalid), an expired
+// one or a name held by another hub (ErrHubExists) leave the record as it
+// was; the caller keeps serving the hub under its old name.
+func (s *State) EnrollKnown(tok enroll.Token, key [crypto.KeyLen]byte) (HubRecord, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	hub, ok := s.byKeyLocked(key)
+	if !ok {
+		return HubRecord{}, ErrHubNotFound
+	}
+	h := tok.Hash()
+	rec, ok := s.tokens[h]
+	if !ok {
+		return hub, enroll.ErrTokenInvalid
+	}
+	if !s.now().Before(rec.Expires) {
+		delete(s.tokens, h)
+		_ = s.save()
+		return hub, enroll.ErrTokenExpired
+	}
+	if other, taken := s.hubs[rec.Name]; taken && other.PublicKey != hub.PublicKey {
+		return hub, fmt.Errorf("enroll again as %q: %w", rec.Name, ErrHubExists)
+	}
+	nh := hub
+	nh.Name, nh.Port = rec.Name, s.port
+	err := s.update(func() func() {
+		delete(s.tokens, h)
+		delete(s.hubs, hub.Name)
+		s.hubs[nh.Name] = nh
+		return func() { s.tokens[h] = rec; delete(s.hubs, nh.Name); s.hubs[hub.Name] = hub }
+	})
+	if err != nil {
+		return hub, err
+	}
+	return nh, nil
 }
 
 // validHubName applies the enrollment code's name rule (enroll.MaxNameLen,

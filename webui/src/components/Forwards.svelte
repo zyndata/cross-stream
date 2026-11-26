@@ -1,5 +1,6 @@
 <script>
   import { api } from '../lib/api.js'
+  import { t } from '../i18n/i18n.svelte.js'
 
   let { hubs = [], onchange, toast } = $props()
   let edits = $state({})
@@ -8,7 +9,7 @@
     const n = Number(edits[name])
     try {
       await api.forward(name, n)
-      toast(`${name}: można przekierować ${n} portów`)
+      toast(t('fwd.saved', { name, n }))
       delete edits[name]
     } catch (err) {
       toast(err.message, true)
@@ -18,17 +19,16 @@
 </script>
 
 <div class="card">
-  <h2>Przekierowania portów</h2>
+  <h2>{t('fwd.title')}</h2>
   <p class="muted small">
-    Ile publicznych portów (1024–49151) hub może przekierować do swojej sieci. Hub sam wybiera porty
-    (GUI huba); tu widać aktywne przekierowania.
+    {t('fwd.hint')}
   </p>
   {#if hubs.length === 0}
-    <p class="muted">Brak hubów.</p>
+    <p class="muted">{t('fwd.noHubs')}</p>
   {:else}
     <div class="scroll">
       <table>
-        <thead><tr><th>Hub</th><th>Limit (0–20)</th><th>Aktywne</th></tr></thead>
+        <thead><tr><th>Hub</th><th>{t('fwd.col.limit')}</th><th>{t('fwd.col.active')}</th></tr></thead>
         <tbody>
           {#each hubs as h (h.name)}
             <tr>
@@ -37,7 +37,7 @@
                 <input type="number" min="0" max="20" value={edits[h.name] ?? h.fwd_allow}
                   oninput={(e) => (edits[h.name] = e.currentTarget.value)} />
                 {#if edits[h.name] !== undefined && edits[h.name] !== '' && Number.isInteger(Number(edits[h.name])) && Number(edits[h.name]) !== h.fwd_allow}
-                  <button class="primary" onclick={() => save(h.name)}>Zapisz</button>
+                  <button class="primary" onclick={() => save(h.name)}>{t('common.save')}</button>
                 {/if}
               </td>
               <td>

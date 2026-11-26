@@ -1,25 +1,17 @@
 <script>
   import { onMount } from 'svelte'
   import { api, errorText } from '../lib/api.js'
+  import { t } from '../i18n/i18n.svelte.js'
 
   let { notify } = $props()
   let info = $state(null)
   let rows = $state([])
   let busy = $state(false)
 
-  const stateLabel = {
-    active: 'działa',
-    pending: 'czeka na serwer',
-    refused: 'odrzucone',
-    no_client: 'brak urządzenia w sieci',
-    not_online: 'brak tunelu',
-  }
-  const reasonLabel = {
-    not_allowed: 'serwer nie pozwala na więcej portów (xs-ctl forward allow)',
-    restricted: 'port zajęty przez serwer',
-    out_of_range: 'dozwolone porty 1024–49151',
-    in_use: 'port używa już inny hub',
-  }
+  const states = ['active', 'pending', 'refused', 'no_client', 'not_online']
+  const reasons = ['not_allowed', 'restricted', 'out_of_range', 'in_use']
+  const stateLabel = (s) => (states.includes(s) ? t('fwd.state.' + s) : s)
+  const reasonLabel = (r) => (reasons.includes(r) ? t('fwd.reason.' + r) : r)
 
   function fill(i) {
     info = i
@@ -34,7 +26,7 @@
     busy = true
     try {
       fill(await api.setForwards(rows.map((r) => ({ ...r, port: Number(r.port) || 0 }))))
-      notify('Przekierowania zapisane')
+      notify(t('fwd.saved'))
     } catch (e) {
       notify(errorText(e), true)
     } finally {
@@ -45,15 +37,13 @@
 </script>
 
 <div class="card">
-  <h2>Przekierowanie portów</h2>
+  <h2>{t('fwd.title')}</h2>
   <p class="small">
-    Port serwera{#if info?.server} <code>{info.server}</code>{/if} prowadzi do tego samego portu urządzenia w sieci
-    huba. Urządzenie wskaż adresem MAC (adres IP z DHCP może się zmienić) albo adresem IP. Tylko gdy hub ma tunel do
-    serwera.
+    {t('fwd.hint1')}{#if info?.server} <code>{info.server}</code>{/if} {t('fwd.hint2')}
   </p>
   {#if rows.length}
     <table>
-      <thead><tr><th>Proto</th><th>Port</th><th>Urządzenie (MAC / IP)</th><th>Nazwa</th><th>Stan</th><th></th></tr></thead>
+      <thead><tr><th>Proto</th><th>Port</th><th>{t('fwd.col.device')}</th><th>{t('fwd.col.name')}</th><th>{t('relays.col.state')}</th><th></th></tr></thead>
       <tbody>
         {#each rows as r, i}
           <tr>
@@ -62,27 +52,27 @@
             </td>
             <td><input class="port" type="number" min="1024" max="49151" bind:value={r.port} /></td>
             <td><input bind:value={r.target} placeholder="aa:bb:cc:dd:ee:ff" spellcheck="false" /></td>
-            <td><input bind:value={r.name} placeholder="np. NAS" /></td>
+            <td><input bind:value={r.name} placeholder={t('fwd.namePh')} /></td>
             <td class="small">
               {#if status(i) && status(i).port === Number(r.port) && status(i).proto === r.proto}
                 <span class:ok={status(i).state === 'active'} class:bad={status(i).state === 'refused'}>
-                  {stateLabel[status(i).state] ?? status(i).state}
+                  {stateLabel(status(i).state)}
                 </span>
-                {#if status(i).reason}<div class="muted">{reasonLabel[status(i).reason] ?? status(i).reason}</div>{/if}
+                {#if status(i).reason}<div class="muted">{reasonLabel(status(i).reason)}</div>{/if}
                 {#if status(i).client}<div class="muted">{status(i).client}</div>{/if}
-              {:else}<span class="muted">niezapisane</span>{/if}
+              {:else}<span class="muted">{t('fwd.unsaved')}</span>{/if}
             </td>
-            <td><button onclick={() => remove(i)} title="Usuń">✕</button></td>
+            <td><button onclick={() => remove(i)} title={t('common.delete')}>✕</button></td>
           </tr>
         {/each}
       </tbody>
     </table>
   {:else}
-    <p class="muted small">Brak przekierowań.</p>
+    <p class="muted small">{t('fwd.none')}</p>
   {/if}
   <div class="row">
-    <button onclick={add} disabled={rows.length >= 20}>Dodaj</button>
-    <button class="primary" onclick={save} disabled={busy}>{busy ? 'Zapisuję…' : 'Zapisz'}</button>
+    <button onclick={add} disabled={rows.length >= 20}>{t('common.add')}</button>
+    <button class="primary" onclick={save} disabled={busy}>{busy ? t('diag.saving') : t('common.save')}</button>
   </div>
 </div>
 

@@ -57,7 +57,10 @@ type recorder struct {
 	cmds  []string
 	route string // ip route show table 100 ("" = table does not exist)
 	rule  string // ip rule show
-	nft   error  // nft list table
+	nft   error  // nft list table ip
+	nft6  bool   // the ip6 table exists (own traffic)
+	dns   string // resolvectl dns <link> ("" = resolved missing)
+	def   string // ip -4 route show default (main table)
 	del   int    // rule del calls that succeed before "no such rule"
 }
 
@@ -65,6 +68,8 @@ func (r *recorder) run(_ context.Context, _, name string, args ...string) (strin
 	c := name + " " + strings.Join(args, " ")
 	r.cmds = append(r.cmds, c)
 	switch {
+	case c == "ip -4 route show default":
+		return r.def, nil
 	case strings.HasPrefix(c, "ip route show"):
 		if r.route == "" {
 			return "", errors.New("ip route show table 100: exit status 2: Error: ipv4: FIB table does not exist")
@@ -72,8 +77,18 @@ func (r *recorder) run(_ context.Context, _, name string, args ...string) (strin
 		return r.route, nil
 	case strings.HasPrefix(c, "ip rule show"):
 		return r.rule, nil
+	case strings.HasPrefix(c, "nft list table ip6"):
+		if r.nft6 {
+			return "", nil
+		}
+		return "", errors.New("no such table")
 	case strings.HasPrefix(c, "nft list"):
 		return "", r.nft
+	case strings.HasPrefix(c, "resolvectl dns") && len(args) == 2:
+		if r.dns == "" {
+			return "", errors.New("resolvectl: not found")
+		}
+		return r.dns, nil
 	case strings.HasPrefix(c, "ip rule del"):
 		if r.del > 0 {
 			r.del--
@@ -87,7 +102,8 @@ func (r *recorder) run(_ context.Context, _, name string, args ...string) (strin
 func (r *recorder) changes() []string {
 	var out []string
 	for _, c := range r.cmds {
-		if !strings.Contains(c, " show") && !strings.HasPrefix(c, "nft list") {
+		if !strings.Contains(c, " show") && !strings.HasPrefix(c, "nft list") &&
+			(!strings.HasPrefix(c, "resolvectl dns") || strings.Count(c, " ") != 2) {
 			out = append(out, c)
 		}
 	}
@@ -122,6 +138,10 @@ func TestRoutesAndCleanup(t *testing.T) {
 		"ip rule del from 10.42.0.0/24 iif wlan0 lookup 100",
 		"ip rule del from 10.42.0.0/24 iif wlan0 lookup 100",
 		"ip rule del from 10.42.1.0/24 iif eth0 lookup 100",
+		"ip rule del lookup main suppress_prefixlength 0 priority 101",
+		"ip rule del not fwmark 0x5853 lookup 100 priority 102",
+		"ip rule show", // bound rules (99) to delete
+		"nft delete table ip6 crossstream_hub",
 		"ip route flush table 100",
 		"nft delete table ip crossstream_hub",
 	}

@@ -42,9 +42,20 @@ type LAN struct {
 	// phones: carriers spot tethering by TTL 63).
 	TTL []string
 	// NoPath: no path carries traffic (hub OFFLINE or CONNECTING). Windows
-	// then drops the TUN routes so the PC keeps its own uplink; Linux needs
-	// nothing (only client subnets are routed into the TUN).
+	// then drops the TUN routes and leak filters so the PC keeps its own
+	// uplink; Linux drops the own-traffic rules (only client subnets stay
+	// routed into the TUN).
 	NoPath bool
+	// OwnTraffic (Linux) routes the laptop's own traffic into the tunnel
+	// while a path carries traffic (own.go). Windows ignores it: its routes
+	// always carry the laptop's own traffic.
+	OwnTraffic bool
+	// TunAddr is the hub's tunnel address: the hub DNS listens there and
+	// systemd-resolved is pointed at it while own traffic is routed.
+	TunAddr netip.Addr
+	// Leaks (Windows) keeps the WFP DNS/IPv6 leak filters, present exactly
+	// while the TUN routes are (nil elsewhere).
+	Leaks *LeakGuard
 	// Forward (Windows NAT mode) turns IP forwarding on for the TUN and the
 	// ports: Mobile Hotspot routes its clients only into the profile it
 	// shares, the hub NATs them on the TUN (tun.NAT). Linux ignores it.
@@ -89,7 +100,14 @@ func (l LAN) Ruleset() string {
 		fmt.Fprintf(&b, "\t\toifname { %s } ip ttl set 65\n", strings.Join(ifs, ", "))
 		b.WriteString("\t}\n")
 	}
+	if l.TunAddr.IsValid() {
+		// The hub DNS on the tunnel address is for the laptop itself only.
+		b.WriteString("\tchain owndns {\n\t\ttype filter hook input priority filter; policy accept;\n")
+		fmt.Fprintf(&b, "\t\tiifname %q meta l4proto { tcp, udp } th dport 53 drop\n", l.TunName)
+		b.WriteString("\t}\n")
+	}
 	b.WriteString("}\n")
+	b.WriteString(l.ownRuleset(l.ownActive()))
 	return b.String()
 }
 
@@ -164,6 +182,7 @@ func (l LAN) setupNft(ctx context.Context) error {
 		return err
 	}
 	l.deleteRules(ctx)
+	l.deleteOwn(ctx) // own-traffic leftovers of a crashed run: Ensure adds them when wanted
 	for _, p := range l.Ports {
 		add, _ := ruleArgs(p)
 		if _, err := runWith(ctx, l.Run, "", "ip", add...); err != nil {
@@ -222,6 +241,9 @@ func (l LAN) ensureNft(ctx context.Context) ([]string, error) {
 				fixed = append(fixed, "rule "+show)
 			}
 		}
+		f, err := l.ensureOwn(ctx, out, l.ownActive())
+		fixed = append(fixed, f...)
+		errs = append(errs, err)
 	}
 	if _, err := runWith(ctx, l.Run, "", "nft", "list", "table", "ip", NFTTable); err != nil {
 		if err := l.applyNft(ctx); err != nil {
@@ -286,7 +308,11 @@ func enableForwarding() error {
 // joined; it does not stop at the first one.
 func (l LAN) cleanupNft(ctx context.Context) error {
 	l.deleteRules(ctx)
+	l.deleteOwn(ctx)
 	var errs []error
+	if _, err := l.ensureResolved(ctx, false); err != nil {
+		errs = append(errs, err)
+	}
 	if _, err := runWith(ctx, l.Run, "", "ip", "route", "flush", "table", strconv.Itoa(Table)); err != nil {
 		errs = append(errs, err)
 	}

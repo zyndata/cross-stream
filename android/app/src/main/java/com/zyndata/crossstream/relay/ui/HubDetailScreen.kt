@@ -15,6 +15,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.Alignment
 import androidx.compose.material3.OutlinedIconButton
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Row
 import androidx.compose.material3.TextButton
@@ -39,17 +40,23 @@ fun HubDetailScreen(
     state: HubState,
     onBack: () -> Unit,
     onUse: (HubUse) -> Unit,
+    onRename: (String) -> Unit,
     onChoose: (Boolean) -> Unit,
     onForget: () -> Unit,
 ) {
     var confirm by remember { mutableStateOf(false) }
+    var renaming by remember { mutableStateOf(false) }
     var useInfo by remember { mutableStateOf(false) }
     Column(
         modifier = Modifier.safeDrawingPadding().padding(20.dp).fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         TextButton(onClick = onBack) { Text(stringResource(R.string.back)) }
-        Text(hub.name, style = MaterialTheme.typography.headlineSmall)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(hub.shownName, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f))
+            TextButton(onClick = { renaming = true }) { Text(stringResource(R.string.hub_rename)) }
+        }
+        if (hub.label.isNotBlank()) Text(stringResource(R.string.hub_own_name, hub.name), style = MaterialTheme.typography.bodySmall)
         Text(hubStateText(state))
         Text(stringResource(R.string.hub_wifi, hub.ssid))
         val seen = if (hub.lastSeen == 0L) {
@@ -94,10 +101,36 @@ fun HubDetailScreen(
             confirmButton = { TextButton(onClick = { useInfo = false }) { Text(stringResource(R.string.ok)) } },
         )
     }
+    if (renaming) {
+        var text by remember { mutableStateOf(hub.shownName) }
+        AlertDialog(
+            onDismissRequest = { renaming = false },
+            title = { Text(stringResource(R.string.hub_rename)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = text,
+                        onValueChange = { text = it.take(SavedHub.LABEL_MAX) },
+                        singleLine = true,
+                        label = { Text(stringResource(R.string.hub_rename_label)) },
+                    )
+                    Text(stringResource(R.string.hub_rename_hint, hub.name), style = MaterialTheme.typography.bodySmall)
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    // The hub's own name typed back is no label.
+                    onRename(if (SavedHub.cleanLabel(text) == hub.name) "" else text)
+                    renaming = false
+                }) { Text(stringResource(R.string.save)) }
+            },
+            dismissButton = { TextButton(onClick = { renaming = false }) { Text(stringResource(R.string.cancel)) } },
+        )
+    }
     if (confirm) {
         AlertDialog(
             onDismissRequest = { confirm = false },
-            title = { Text(stringResource(R.string.forget_title, hub.name)) },
+            title = { Text(stringResource(R.string.forget_title, hub.shownName)) },
             text = { Text(stringResource(R.string.forget_text)) },
             confirmButton = { TextButton(onClick = onForget) { Text(stringResource(R.string.forget)) } },
             dismissButton = { TextButton(onClick = { confirm = false }) { Text(stringResource(R.string.cancel)) } },

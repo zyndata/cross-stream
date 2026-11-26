@@ -60,6 +60,11 @@ type Status struct {
 	Direct        *DirectStatus `json:"direct,omitempty"`
 	PEP           *PEPStatus    `json:"pep,omitempty"`
 	Warnings      []string      `json:"warnings,omitempty"`
+	// OwnTraffic: the laptop's own traffic goes through CrossStream (the
+	// setting; always true on Windows). OwnDNS (Linux, while on): resolved
+	// or system (no systemd-resolved: DNS left as it is), phase 21.
+	OwnTraffic bool   `json:"own_traffic"`
+	OwnDNS     string `json:"own_traffic_dns,omitempty"`
 	// OverflowMbps is the hub-wide overflow setting (settings.get).
 	OverflowMbps uint16 `json:"overflow_mbps"`
 	// BondMode (max_throughput / min_latency) and Redundancy (off / auto /
@@ -290,6 +295,7 @@ func (d *Daemon) Status() Status {
 	var perRelay map[string]int
 	st.Direct, perRelay = d.directStatus()
 	st.PEP = d.pepStatus()
+	d.ownTrafficStatus(&st, set)
 	paths := make(map[uint8]bond.PathStats)
 	if rep.Up {
 		st.TunnelMTU = rep.TunnelMTU

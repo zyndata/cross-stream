@@ -1,8 +1,9 @@
 <script>
   // Modal yes/no dialog. Esc or a click outside = "no".
   import { portal } from '../lib/portal.js'
+  import { t } from '../i18n/i18n.svelte.js'
 
-  let { title, yes = 'Tak', no = 'Nie', danger = false, onyes, onno, children } = $props()
+  let { title, yes, no, danger = false, onyes, onno, children } = $props()
   let noButton = $state()
 
   $effect(() => {
@@ -17,8 +18,8 @@
     <h3 id="dlg-title">{title}</h3>
     <div class="body">{@render children()}</div>
     <div class="buttons">
-      <button bind:this={noButton} onclick={onno}>{no}</button>
-      <button class:primary={!danger} class:danger-fill={danger} onclick={onyes}>{yes}</button>
+      <button bind:this={noButton} onclick={onno}>{no ?? t('common.no')}</button>
+      <button class:primary={!danger} class:danger-fill={danger} onclick={onyes}>{yes ?? t('common.yes')}</button>
     </div>
   </div>
 </div>

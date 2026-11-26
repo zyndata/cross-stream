@@ -9,7 +9,7 @@ import (
 )
 
 // Level is the daemon's log level, changeable at run time (xs-hubctl
-// loglevel, GUI "Szczegółowe logi"). Give Var() to the slog handler: every
+// loglevel, GUI "Detailed logs"). Give Var() to the slog handler: every
 // writer behind it (stderr and the Ring) follows the change.
 type Level struct {
 	v     slog.LevelVar

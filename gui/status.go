@@ -30,6 +30,8 @@ type hubStatus struct {
 	Relays       []relayStatus  `json:"relays"`
 	Uplinks      []uplinkStatus `json:"uplinks"`
 	LogLevel     *logLevel      `json:"log_level"`
+	OwnTraffic   *bool          `json:"own_traffic"` // nil: an older xs-hubd (phase 21)
+	OwnDNS       string         `json:"own_traffic_dns"`
 }
 
 type directStatus struct {

@@ -1,6 +1,7 @@
 <script>
   import { onMount } from 'svelte'
   import { api } from '../lib/api.js'
+  import { t } from '../i18n/i18n.svelte.js'
   let { view } = $props()
   // Windows: the service is CrossStreamHub (sc.exe), no sudo/systemctl.
   let windows = $state(false)
@@ -24,81 +25,76 @@
       choosing = false
     }
   }
-  const triedLabel = { share: 'hotspot obok tej sieci', disconnect: 'rozłączenie Wi-Fi' }
+  const tried = (v) => (v === 'share' || v === 'disconnect' ? t('wifiAsk.tried.' + v) : v)
 </script>
 
 <div class="card err">
   {#if view.state === 'wifi' && view.client_wifi}
     {@const q = view.client_wifi}
-    <h2>Karta Wi-Fi jest połączona z siecią „{q.conn}”</h2>
-    <p>Hub potrzebuje karty <code>{q.iface}</code> do hotspotu, z którym łączą się telefony. Wybierz, co zrobić —
-      wybór zostanie zapamiętany (zmienisz go w Ustawieniach → Hotspot Wi-Fi).</p>
+    <h2>{t('wifiAsk.title', { conn: q.conn })}</h2>
+    <p>{t('wifiAsk.body1')} <code>{q.iface}</code> {t('wifiAsk.body2')}</p>
     {#if q.error}
-      <p class="banner bad">Nie udało się: {triedLabel[q.tried] ?? q.tried}. {q.error}</p>
+      <p class="banner bad">{t('wifiAsk.failed', { what: tried(q.tried) })} {q.error}</p>
     {/if}
     <div class="choices">
       {#if q.can_share}
         <div>
-          <button class="primary" disabled={choosing} onclick={() => choose('share')}>Hotspot obok sieci „{q.conn}”</button>
-          <p class="muted small">Laptop zostaje w tej sieci, hotspot działa obok na tym samym kanale. Nie każda karta
-            i nie każdy kanał na to pozwala — jeśli się nie uda, zapytam ponownie.</p>
+          <button class="primary" disabled={choosing} onclick={() => choose('share')}>{t('wifiAsk.share', { conn: q.conn })}</button>
+          <p class="muted small">{t('wifiAsk.shareHint')}</p>
         </div>
       {/if}
       <div>
-        <button class:primary={!q.can_share} disabled={choosing} onclick={() => choose('disconnect')}>Rozłącz Wi-Fi</button>
-        <p class="muted small">Laptop odłączy się od sieci „{q.conn}”; jego internet pójdzie tunelem przez telefony.</p>
+        <button class:primary={!q.can_share} disabled={choosing} onclick={() => choose('disconnect')}>{t('wifiAsk.disconnect')}</button>
+        <p class="muted small">{t('wifiAsk.disconnectHint', { conn: q.conn })}</p>
       </div>
     </div>
     {#if !q.can_share}
-      <p class="muted small">Ta karta nie potrafi prowadzić hotspotu obok połączenia z siecią. Inna możliwość: druga
-        karta Wi-Fi (USB) na hotspot.</p>
+      <p class="muted small">{t('wifiAsk.cannotShare')}</p>
     {/if}
     {#if choiceErr}<p class="banner bad">{choiceErr}</p>{/if}
   {:else if view.state === 'group'}
-    <h2>Brak dostępu do usługi xs-hubd</h2>
-    <p>Twój użytkownik nie należy do grupy <code>crossstream</code>, więc aplikacja nie może sterować hubem.</p>
+    <h2>{t('state.group.title')}</h2>
+    <p>{t('state.group.body1')} <code>crossstream</code>{t('state.group.body2')}</p>
     <ol>
       {#if windows}
         <li>
-          Instalator (<code>install.ps1</code>) dodaje do grupy użytkownika, który go uruchomił; innego dodasz w
-          PowerShell jako administrator: <code>Add-LocalGroupMember crossstream -Member NAZWA</code>
+          {t('state.group.win1')} (<code>install.ps1</code>) {t('state.group.win2')}
+          <code>Add-LocalGroupMember crossstream -Member {t('state.group.winName')}</code>
         </li>
       {:else}
-        <li>Dodaj użytkownika do grupy: <code>sudo usermod -aG crossstream $USER</code></li>
+        <li>{t('state.group.linux')} <code>sudo usermod -aG crossstream $USER</code></li>
       {/if}
-      <li>Wyloguj się i zaloguj ponownie (albo uruchom komputer ponownie).</li>
+      <li>{t('state.group.relogin')}</li>
     </ol>
   {:else if view.state === 'daemon' && view.starting}
-    <h2>Uruchamiam usługę xs-hubd…</h2>
-    <p>Aplikacja jest tylko panelem — hubem steruje usługa systemowa <code>xs-hubd</code>. Start trwa
-      zwykle kilka–kilkanaście sekund (z hotspotem Windows ok. 10 s).</p>
+    <h2>{t('state.starting.title')}</h2>
+    <p>{t('state.panelOnly')} <code>xs-hubd</code>{t('state.starting.body')}</p>
   {:else if view.state === 'daemon'}
     {#if view.lost}
-      <h2>Usługa xs-hubd przestała działać</h2>
-      <p>Hub działał i został zatrzymany (albo proces zakończył się błędem). Telefony i klienci hotspotu
-        nie mają teraz połączenia.</p>
+      <h2>{t('state.lost.title')}</h2>
+      <p>{t('state.lost.body')}</p>
     {:else}
-      <h2>Usługa xs-hubd nie działa</h2>
-      <p>Aplikacja jest tylko panelem — hubem steruje usługa systemowa <code>xs-hubd</code>.</p>
+      <h2>{t('state.down.title')}</h2>
+      <p>{t('state.panelOnly')} <code>xs-hubd</code>.</p>
     {/if}
-    {#if control}<p><button class="primary" onclick={start}>Uruchom usługę</button></p>{/if}
+    {#if control}<p><button class="primary" onclick={start}>{t('state.start')}</button></p>{/if}
     {#if windows}
-      <p>Aplikacja sama uruchamia usługę <code>CrossStreamHub</code>; start trwa do kilkunastu sekund.</p>
+      <p>{t('state.win.auto1')} <code>CrossStreamHub</code>{t('state.win.auto2')}</p>
       <ol>
-        <li>Jeśli to nie mija: PowerShell jako administrator, <code>Start-Service CrossStreamHub</code></li>
-        <li>Logi: <code>C:\ProgramData\CrossStream\xs-hubd.log</code> (dostęp ma administrator)</li>
+        <li>{t('state.win.manual')} <code>Start-Service CrossStreamHub</code></li>
+        <li>{t('state.logs')} <code>C:\ProgramData\CrossStream\xs-hubd.log</code> {t('state.win.logsAdmin')}</li>
       </ol>
     {:else}
       <ol>
-        <li>Uruchom ją: <code>sudo systemctl start xs-hubd</code></li>
-        <li>Stan i logi: <code>systemctl status xs-hubd</code>, <code>journalctl -u xs-hubd -e</code></li>
+        <li>{t('state.linux.start')} <code>sudo systemctl start xs-hubd</code></li>
+        <li>{t('state.linux.logs')} <code>systemctl status xs-hubd</code>, <code>journalctl -u xs-hubd -e</code></li>
       </ol>
     {/if}
   {:else}
-    <h2>Błąd połączenia z xs-hubd</h2>
+    <h2>{t('state.error.title')}</h2>
   {/if}
-  {#if view.error}<p class="muted small">Szczegóły: {view.error}</p>{/if}
-  {#if view.state !== 'wifi'}<p class="muted small">Ponawiam połączenie co 2 s…</p>{/if}
+  {#if view.error}<p class="muted small">{t('state.details', { error: view.error })}</p>{/if}
+  {#if view.state !== 'wifi'}<p class="muted small">{t('state.retry')}</p>{/if}
 </div>
 
 <style>

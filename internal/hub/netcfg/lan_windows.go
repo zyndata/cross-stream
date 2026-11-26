@@ -25,6 +25,11 @@ import (
 // skips resolving the server endpoints for it.
 const LoopGuard = false
 
+// OwnTrafficAlways is true on Windows: it has no source policy routing, so forwarded
+// hotspot packets and the PC's own take the same TUN routes; there is no
+// "off" (phase 21 W1).
+const OwnTrafficAlways = true
+
 // ErrNoForwards is returned by ApplyRules on Windows when port forwards are set.
 var ErrNoForwards = errors.New("port forwarding is not available on a Windows hub")
 
@@ -51,6 +56,7 @@ func (l LAN) Ensure(context.Context) ([]string, error) {
 	}
 	tun, err := net.InterfaceByName(l.TunName)
 	if err != nil {
+		_, _ = l.Leaks.ensure(false, 0)
 		return nil, nil // no tunnel yet: hotspot clients stay local
 	}
 	ifc := iphlp.Iface{Index: uint32(tun.Index)}
@@ -86,6 +92,14 @@ func (l LAN) Ensure(context.Context) ([]string, error) {
 		f, err := l.ensureForwarding(tun.Index)
 		fixed = append(fixed, f...)
 		errs = append(errs, err)
+	}
+	// Leak filters go with the routes (phase 21 W2, OFFLINE = fallback).
+	if luid, err := iphlp.LUID(ifc); err != nil {
+		errs = append(errs, err)
+	} else if f, err := l.Leaks.ensure(!l.NoPath, luid); err != nil {
+		errs = append(errs, err)
+	} else if f != "" {
+		fixed = append(fixed, f)
 	}
 	if err := errors.Join(errs...); err != nil {
 		return fixed, fmt.Errorf("netcfg ensure: %w", err)
@@ -126,8 +140,10 @@ func (l LAN) ApplyRules(context.Context) error {
 	return nil
 }
 
-// Cleanup removes the TUN routes (they also go with the adapter).
+// Cleanup removes the leak filters and the TUN routes (they also go with
+// the adapter).
 func (l LAN) Cleanup(context.Context) error {
+	l.Leaks.Close()
 	if tun, err := net.InterfaceByName(l.TunName); err == nil {
 		for _, p := range tunRoutes {
 			_ = iphlp.DeleteRoute(iphlp.Iface{Index: uint32(tun.Index)}, iphlp.Route{Dst: p})

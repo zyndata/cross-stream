@@ -1,10 +1,12 @@
 <script>
   // Total throughput, last 5 minutes (one sample per second from the backend).
+  import { t, num } from '../i18n/i18n.svelte.js'
+
   let { history = [] } = $props()
 
   const H = 230
   const L = 64 // left margin for labels
-  const R = 30 // right margin ("teraz")
+  const R = 30 // right margin ("now")
   const B = 20 // bottom margin
   let width = $state(640)
   let W = $derived(Math.max(300, width))
@@ -35,17 +37,17 @@
 
 <div class="card">
   <h2>
-    Przepustowość (5 min)
-    <span class="legend"><i class="up"></i>wysyłanie <i class="down"></i>pobieranie</span>
+    {t('chart.title')}
+    <span class="legend"><i class="up"></i>{t('chart.up')} <i class="down"></i>{t('chart.down')}</span>
   </h2>
   <div bind:clientWidth={width}>
-  <svg width={W} height={H} viewBox="0 0 {W} {H}" role="img" aria-label="Wykres przepustowości">
+  <svg width={W} height={H} viewBox="0 0 {W} {H}" role="img" aria-label={t('chart.label')}>
     {#each ticks as v}
       <line x1={L} x2={W - R} y1={y(v)} y2={y(v)} class="grid" />
-      <text x={L - 6} y={y(v) + 4} text-anchor="end">{v === 0 ? '0' : v < 1 ? v.toFixed(1) : v} Mb/s</text>
+      <text x={L - 6} y={y(v) + 4} text-anchor="end">{v === 0 ? '0' : num(v, v < 1 ? 1 : 0)} Mb/s</text>
     {/each}
     {#each [0, 1, 2, 3, 4, 5] as m}
-      <text x={x(end - SPAN + m * 60_000)} y={H - 3} text-anchor="middle">{m === 5 ? 'teraz' : `-${5 - m} min`}</text>
+      <text x={x(end - SPAN + m * 60_000)} y={H - 3} text-anchor="middle">{m === 5 ? t('chart.now') : `-${5 - m} min`}</text>
     {/each}
     {#if history.length > 1}
       <polyline points={line('down')} class="down" />

@@ -1,5 +1,7 @@
 <script>
   import { api, setCsrf } from '../lib/api.js'
+  import LangSwitch from './LangSwitch.svelte'
+  import { t } from '../i18n/i18n.svelte.js'
 
   let { onlogin } = $props()
   let user = $state('')
@@ -22,11 +24,11 @@
     } catch (err) {
       if (err.message === 'totp_required') {
         needCode = true
-        error = 'Podaj kod z aplikacji uwierzytelniającej.'
+        error = t('login.needCode')
       } else if (err.status === 429) {
-        error = 'Za dużo prób logowania. Spróbuj ponownie za kilka minut.'
+        error = t('login.tooMany')
       } else {
-        error = 'Nieprawidłowy użytkownik, hasło lub kod.'
+        error = t('login.bad')
       }
     } finally {
       busy = false
@@ -36,17 +38,17 @@
 
 <div class="wrap">
   <form class="card" onsubmit={submit}>
-    <h1>CrossStream</h1>
-    <p class="muted">Panel serwera</p>
-    <label>Użytkownik <input bind:value={user} autocomplete="username" required /></label>
-    <label>Hasło <input type="password" bind:value={password} autocomplete="current-password" required /></label>
+    <div class="top"><h1>CrossStream</h1><LangSwitch /></div>
+    <p class="muted">{t('login.subtitle')}</p>
+    <label>{t('login.user')} <input bind:value={user} autocomplete="username" required /></label>
+    <label>{t('login.password')} <input type="password" bind:value={password} autocomplete="current-password" required /></label>
     {#if needCode}
       <!-- svelte-ignore a11y_autofocus -->
-      <label>Kod 2FA <input bind:value={code} inputmode="numeric" autocomplete="one-time-code" maxlength="6" autofocus /></label>
+      <label>{t('login.code')} <input bind:value={code} inputmode="numeric" autocomplete="one-time-code" maxlength="6" autofocus /></label>
     {/if}
     {#if error}<div class="banner bad">{error}</div>{/if}
-    <button class="primary" disabled={busy}>Zaloguj</button>
-    <p class="muted small">Konto tworzy się na serwerze: <code>xs-ctl admin add &lt;użytkownik&gt;</code></p>
+    <button class="primary" disabled={busy}>{t('login.submit')}</button>
+    <p class="muted small">{t('login.hint')} <code>xs-ctl admin add &lt;{t('login.userArg')}&gt;</code></p>
   </form>
 </div>
 
@@ -67,6 +69,12 @@
   h1 {
     margin: 0;
     font-size: 20px;
+  }
+  .top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
   }
   p {
     margin: 0;

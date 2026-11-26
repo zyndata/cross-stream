@@ -4,6 +4,7 @@
   import RenameDialog from './RenameDialog.svelte'
   import { api } from '../lib/api.js'
   import { mbps, when } from '../lib/format.js'
+  import { t } from '../i18n/i18n.svelte.js'
 
   let { hubs = [], sessions = [], onchange, toast } = $props()
   let enrolling = $state(false)
@@ -17,7 +18,7 @@
     revoking = null
     try {
       await api.revoke(name)
-      toast(`Hub ${name} usunięty`)
+      toast(t('hubs.revoked', { name }))
     } catch (err) {
       toast(err.message, true)
     }
@@ -28,7 +29,7 @@
     renaming = null
     try {
       await api.rename(name, newName)
-      toast(`Zmieniono nazwę: ${name} → ${newName}`)
+      toast(t('hubs.renamed', { name, newName }))
     } catch (err) {
       toast(err.message, true)
     }
@@ -38,22 +39,21 @@
 
 <div class="card">
   <h2>
-    Huby
-    <button class="primary add" onclick={() => (enrolling = true)}>Dodaj hub</button>
+    {t('nav.hubs')}
+    <button class="primary add" onclick={() => (enrolling = true)}>{t('hubs.add')}</button>
   </h2>
   {#if stale.length}
     <div class="banner bad">
-      Port tunelu serwera się zmienił. Te huby mają w kodzie stary port i nie połączą się, dopóki nie zarejestrujesz
-      ich ponownie (Usuń → Dodaj hub → nowy kod w hubie): {stale.map((h) => h.name).join(', ')}
+      {t('hubs.stale', { names: stale.map((h) => h.name).join(', ') })}
     </div>
   {/if}
   {#if hubs.length === 0}
-    <p class="muted">Brak zarejestrowanych hubów. Kliknij „Dodaj hub”, aby utworzyć kod rejestracji.</p>
+    <p class="muted">{t('hubs.none')}</p>
   {:else}
     <div class="scroll">
       <table>
         <thead>
-          <tr><th>Nazwa</th><th>Stan</th><th>Adres w tunelu</th><th>Ścieżki</th><th>Od huba</th><th>Do huba</th><th>Dodany</th><th></th></tr>
+          <tr><th>{t('hubs.col.name')}</th><th>{t('hubs.col.state')}</th><th>{t('hub.tunnelIp')}</th><th>{t('hubs.col.paths')}</th><th>{t('hub.fromHub')}</th><th>{t('hub.toHub')}</th><th>{t('hubs.col.added')}</th><th></th></tr>
         </thead>
         <tbody>
           {#each hubs as h (h.name)}
@@ -62,7 +62,7 @@
               <td><a href="#/hubs/{encodeURIComponent(h.name)}">{h.name}</a></td>
               <td>
                 <span class="chip" class:ok={h.online}>{h.online ? 'online' : 'offline'}</span>
-                {#if h.reenroll}<span class="chip bad" title="Zarejestrowany z portem {h.port}">zarejestruj ponownie</span>{/if}
+                {#if h.reenroll}<span class="chip bad" title={t('hubs.enrolledPort', { port: h.port })}>{t('hubs.reenroll')}</span>{/if}
               </td>
               <td>{h.tunnel_ip}</td>
               <td>{s ? s.paths?.length || 0 : '—'}</td>
@@ -70,8 +70,8 @@
               <td>{s ? mbps(s.tx_rate) : '—'}</td>
               <td class="small">{when(h.enrolled)}</td>
               <td class="actions">
-                <button onclick={() => (renaming = h.name)}>Zmień nazwę</button>
-                <button class="danger" onclick={() => (revoking = h.name)}>Usuń</button>
+                <button onclick={() => (renaming = h.name)}>{t('hubs.rename')}</button>
+                <button class="danger" onclick={() => (revoking = h.name)}>{t('common.delete')}</button>
               </td>
             </tr>
           {/each}
@@ -85,9 +85,8 @@
   <EnrollDialog onclose={() => (enrolling = false)} ondone={onchange} />
 {/if}
 {#if revoking}
-  <ConfirmDialog title="Usunąć hub?" yes="Usuń" no="Anuluj" danger onyes={() => revoke(revoking)} onno={() => (revoking = null)}>
-    Hub <b>{revoking}</b> straci dostęp od razu: jego klucz zostanie usunięty, a sesja zamknięta. Aby go znów
-    podłączyć, trzeba go zarejestrować od nowa.
+  <ConfirmDialog title={t('hubs.revokeAsk')} yes={t('common.delete')} no={t('common.cancel')} danger onyes={() => revoke(revoking)} onno={() => (revoking = null)}>
+    Hub <b>{revoking}</b> {t('hubs.revokeBody')}
   </ConfirmDialog>
 {/if}
 {#if renaming}

@@ -10,6 +10,8 @@
   import Toast from './components/Toast.svelte'
   import RestartBanner from './components/RestartBanner.svelte'
   import { api, setCsrf, stream } from './lib/api.js'
+  import LangSwitch from './components/LangSwitch.svelte'
+  import { t } from './i18n/i18n.svelte.js'
 
   let user = $state(null) // null = checking, '' = logged out
   let ingress = $state(false) // behind Home Assistant ingress: HA does the login
@@ -27,12 +29,12 @@
   let es = null
 
   const pages = [
-    ['#/', 'Pulpit'],
-    ['#/hubs', 'Huby'],
-    ['#/forwards', 'Przekierowania'],
-    ['#/info', 'Serwer'],
-    ['#/audit', 'Dziennik'],
-    ['#/logs', 'Logi'],
+    ['#/', 'nav.dashboard'],
+    ['#/hubs', 'nav.hubs'],
+    ['#/forwards', 'nav.forwards'],
+    ['#/info', 'nav.server'],
+    ['#/audit', 'nav.audit'],
+    ['#/logs', 'nav.logs'],
   ]
 
   function toast(msg, bad = false) {
@@ -72,13 +74,13 @@
         history = h
         live = true
       },
-      tick: (t) => {
+      tick: (tk) => {
         live = true
         const prev = sample
-        sample = t.sample
-        sessions = t.sessions
-        history = [...history.slice(-299), t.sample]
-        if (!prev || prev.total !== t.sample.total || prev.online !== t.sample.online) loadHubs()
+        sample = tk.sample
+        sessions = tk.sessions
+        history = [...history.slice(-299), tk.sample]
+        if (!prev || prev.total !== tk.sample.total || prev.online !== tk.sample.online) loadHubs()
       },
       logout: loggedOut,
       error: () => {
@@ -136,13 +138,14 @@
     <strong>CrossStream</strong>
     <nav>
       {#each pages as [href, label]}
-        <a {href} class:active={active === href}>{label}</a>
+        <a {href} class:active={active === href}>{t(label)}</a>
       {/each}
     </nav>
     <span class="who">
-      <span class="dot" class:on={live} title={live ? 'Dane na żywo' : 'Brak połączenia z serwerem'}></span>
+      <span class="dot" class:on={live} title={live ? t('app.live') : t('app.notLive')}></span>
       {user}
-      {#if !ingress}<button onclick={logout}>Wyloguj</button>{/if}
+      <LangSwitch />
+      {#if !ingress}<button onclick={logout}>{t('app.logout')}</button>{/if}
     </span>
   </header>
   <main>

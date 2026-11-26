@@ -1,5 +1,6 @@
 <script>
   import { api, errorText } from '../lib/api.js'
+  import { t, loc } from '../i18n/i18n.svelte.js'
 
   let { view, notify } = $props()
   let busy = $state(false)
@@ -9,14 +10,14 @@
   let lvl = $derived(view?.log_level ?? null)
   let verbose = $derived(lvl?.level === 'debug')
   let until = $derived(
-    lvl?.until ? new Date(lvl.until).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' }) : '',
+    lvl?.until ? new Date(lvl.until).toLocaleTimeString(loc(), { hour: '2-digit', minute: '2-digit' }) : '',
   )
 
   async function exportLogs() {
     busy = true
     try {
       const path = await api.exportLogs()
-      if (path) notify('Zapisano logi: ' + path)
+      if (path) notify(t('diag.saved', { path }))
     } catch (e) {
       notify(errorText(e), true)
     } finally {
@@ -29,7 +30,7 @@
     switching = true
     try {
       await api.setVerboseLogs(on)
-      notify(on ? 'Szczegółowe logi włączone na 15 min' : 'Szczegółowe logi wyłączone')
+      notify(on ? t('diag.verboseOn') : t('diag.verboseOff'))
     } catch (e) {
       el.checked = !on // bound one way: put back what the hub still has
       notify(errorText(e), true)
@@ -40,20 +41,19 @@
 </script>
 
 <div class="card">
-  <h2>Diagnostyka</h2>
+  <h2>{t('diag.title')}</h2>
   <p class="muted small">
-    Ostatnie logi huba do pliku tekstowego. Kody, hasła, klucze, adresy MAC i publiczne adresy IP są ukryte,
-    więc plik można wysłać, prosząc o pomoc.
+    {t('diag.hint')}
   </p>
   <div class="row">
-    <button onclick={exportLogs} disabled={busy}>{busy ? 'Zapisuję…' : 'Eksportuj logi'}</button>
+    <button onclick={exportLogs} disabled={busy}>{busy ? t('diag.saving') : t('diag.export')}</button>
     {#if lvl}
-      <label class="switch" title="Więcej szczegółów w logach przez 15 minut, potem powrót do zwykłych">
+      <label class="switch" title={t('diag.verboseHint')}>
         <input type="checkbox" checked={verbose} disabled={switching}
           onchange={(e) => setVerbose(e.currentTarget)} />
-        <span>Szczegółowe logi (15 min)</span>
+        <span>{t('diag.verbose')}</span>
       </label>
-      {#if verbose && until}<span class="muted small">do {until}</span>{/if}
+      {#if verbose && until}<span class="muted small">{t('diag.until', { time: until })}</span>{/if}
     {/if}
   </div>
 </div>

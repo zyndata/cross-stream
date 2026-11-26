@@ -80,6 +80,16 @@ local-only network (no internet), so the phone's default network stays cellular.
   so the BSSID is stable — Android skips the approval dialog only for a specific SSID+BSSID).
 - TUN `xs0` with the hub tunnel IP. Policy routing: `from 10.42.0.0/24 lookup 100`,
   table 100 `default dev xs0`. nft masquerade `10.42.0.0/24 → xs0`. TCP MSS clamp.
+- Laptop's own traffic (phase 21): Linux setting `own_traffic` (default off). While on and a
+  path carries traffic (BONDED/DIRECT): rules `lookup main suppress_prefixlength 0` (101) and
+  `not fwmark 0x5853 lookup 100` (102) — every xs-hubd socket carries `SO_MARK` 0x5853
+  (`netcfg.Control`), everything else from the laptop (and its Docker containers) uses
+  table 100; nft `ip6 crossstream_hub` rejects unmarked non-link-local IPv6 output;
+  systemd-resolved gets `dns xs0 <tunnel IP>` + `domain ~.`, served by the hub DNS on the
+  tunnel address (port 53 from `xs0` itself dropped). OFFLINE/CONNECTING removes all of it
+  (fallback to the laptop's own links). Windows: always on (routes `0/1` + `128/1` in `xs0`
+  while a path carries), plus WFP filters in a dynamic session (`internal/wfp`: block port
+  53 and IPv6 outside `xs0`, permit xs-hubd and loopback), removed with the routes.
 - DNS: NM dnsmasq DNS disabled via `/etc/NetworkManager/dnsmasq-shared.d/crossstream.conf`
   (`port=0`, `dhcp-option=option:dns-server,0.0.0.0` = the port address); xs-hubd serves DNS on `10.42.0.1:53` and forwards
   through the active mode (tunnel in BONDED, a relay in DIRECT).
@@ -299,10 +309,11 @@ OFFLINE ──(≥1 path alive)───► CONNECTING ──(handshake ok)─�
 - GUI shows the same privacy warning as DIRECT for bypassed domains.
 
 ### Usage history (phase 11)
-- Hub store `/var/lib/crossstream/usage.json`: per relay per day `{up, down}` bytes,
+- Hub store `/var/lib/crossstream/usage.json`: per relay id per day `{up, down}` bytes (a phone
+  forgotten and paired again with the same key gets its old id back, so its history stays one entry),
   failovers survived ("seamless failovers" counter shown in the GUI),
   speed-test results; keep 400 days, atomic writes every 60 s and on shutdown.
-- IPC `usage.get(relay?, from, to)`; GUI "Statystyki" view (was "Podziękowania"): per friend this month / all time,
+- IPC `usage.get(relay?, from, to)`; GUI "Statistics" view: per friend this month / all time,
   top sharers, chart per day.
 
 ### Friend-side priority cap (phase 11)
@@ -363,8 +374,8 @@ OFFLINE ──(≥1 path alive)───► CONNECTING ──(handshake ok)─�
   `uplinks.captive {uplink, open}` probes now; with `open` it adds a host route for the
   portal's addresses through the link for 10 min (`ip route replace` on Linux,
   `CreateIpForwardEntry2` on Windows) and the caller opens the browser (`xs-hubctl uplinks captive -open`,
-  GUI "Zaloguj"). When the route fails the hint is "Zaloguj się w tej sieci na telefonie
-  lub wyłącz hub na chwilę".
+  GUI "Log in"). When the route fails the hint is "Log in to this network on a phone or
+  turn the hub off for a moment" (the GUI shows it in its own language).
 - The GUI starts `xs-hubd` (`systemctl start`, polkit rule for group `crossstream`) when its
   socket is missing and asks on window close whether to keep the hub running or stop it.
 - Mode state machine counts local uplinks as paths ("≥ 1 path alive").

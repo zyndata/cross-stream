@@ -1,6 +1,7 @@
 <script>
   import { api } from '../lib/api.js'
   import { when } from '../lib/format.js'
+  import { t } from '../i18n/i18n.svelte.js'
 
   let entries = $state([])
   let error = $state('')
@@ -9,30 +10,28 @@
   }
   load()
 
-  const actions = {
-    enroll: 'kod rejestracji', revoke: 'usunięcie huba', rename: 'zmiana nazwy', forward_allow: 'limit przekierowań',
-    login: 'logowanie', logout: 'wylogowanie', login_lockout: 'blokada logowania', admin_add: 'nowy administrator',
-    admin_passwd: 'zmiana hasła', admin_del: 'usunięcie administratora', admin_totp: '2FA',
-  }
+  const actions = ['enroll', 'revoke', 'rename', 'forward_allow', 'login', 'logout', 'login_lockout', 'admin_add',
+    'admin_passwd', 'admin_del', 'admin_totp', 'tunnel_port', 'restart']
+  const action = (a) => (actions.includes(a) ? t('audit.action.' + a) : a)
 </script>
 
 <div class="card">
-  <h2>Dziennik zmian <button class="refresh" onclick={load}>Odśwież</button></h2>
+  <h2>{t('audit.title')} <button class="refresh" onclick={load}>{t('common.refresh')}</button></h2>
   {#if error}<div class="banner bad">{error}</div>{/if}
   <div class="scroll">
     <table>
-      <thead><tr><th>Czas</th><th>Kto</th><th>Akcja</th><th>Cel</th><th>Wynik</th></tr></thead>
+      <thead><tr><th>{t('audit.col.time')}</th><th>{t('audit.col.who')}</th><th>{t('audit.col.action')}</th><th>{t('audit.col.target')}</th><th>{t('audit.col.result')}</th></tr></thead>
       <tbody>
         {#each entries as e}
           <tr>
             <td class="small nowrap">{when(e.time)}</td>
             <td class="small">{e.actor}</td>
-            <td>{actions[e.action] || e.action}</td>
+            <td>{action(e.action)}</td>
             <td>{e.target || ''} <span class="muted small">{e.detail || ''}</span></td>
-            <td>{#if e.ok}<span class="chip">ok</span>{:else}<span class="chip bad">{e.error || 'błąd'}</span>{/if}</td>
+            <td>{#if e.ok}<span class="chip">ok</span>{:else}<span class="chip bad">{e.error || t('audit.error')}</span>{/if}</td>
           </tr>
         {:else}
-          <tr><td colspan="5" class="muted">Brak wpisów.</td></tr>
+          <tr><td colspan="5" class="muted">{t('audit.none')}</td></tr>
         {/each}
       </tbody>
     </table>

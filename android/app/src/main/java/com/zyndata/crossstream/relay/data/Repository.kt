@@ -87,7 +87,12 @@ class Repository(private val context: Context, private val store: DataStore<Pref
         val old = list.firstOrNull { it.id == hub.id }
         list.filter { it.id != hub.id } +
             hub.copy(lastSeen = old?.lastSeen ?: 0, sharedBytes = old?.sharedBytes ?: 0, use = old?.use ?: hub.use,
-                preferred = old?.preferred ?: hub.preferred)
+                preferred = old?.preferred ?: hub.preferred, label = old?.label ?: hub.label)
+    }
+
+    /** Gives a hub the friend's own name ("" = back to the hub's name); only this phone sees it. */
+    suspend fun renameHub(id: String, label: String) = updateHubs { list ->
+        list.map { if (it.id == id) it.copy(label = SavedHub.cleanLabel(label)) else it }
     }
 
     /** Makes id the chosen hub ("" = choose automatically); at most one hub is chosen. */

@@ -84,6 +84,9 @@ type Hotspot struct {
 	DeviceWait time.Duration
 
 	vif string // AP interface a ClientWifiShare added ("" = none)
+	// restore is the Wi-Fi connection a ClientWifiDisconnect took the card
+	// from; Down connects it again ("" = none).
+	restore string
 }
 
 // ValidateHotspot checks the user-settable fields.
@@ -344,6 +347,13 @@ func (h *Hotspot) Down(ctx context.Context) error {
 	}
 	if err := h.dropVif(ctx); err != nil {
 		errs = append(errs, err)
+	}
+	// The laptop goes back to the network the hotspot took it from (owner, 2026-11-26).
+	if conn := h.restore; conn != "" {
+		h.restore = ""
+		if _, err := runWith(ctx, h.Run, "", "nmcli", "--wait", "15", "connection", "up", "id", conn); err != nil {
+			errs = append(errs, fmt.Errorf("reconnect Wi-Fi %q: %w", conn, err))
+		}
 	}
 	if err := errors.Join(errs...); err != nil {
 		return fmt.Errorf("hotspot down: %w", err)

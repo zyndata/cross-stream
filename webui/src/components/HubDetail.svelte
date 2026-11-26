@@ -1,48 +1,49 @@
 <script>
   import { mbps, bytes, ms, pct, ago, pathState, priority } from '../lib/format.js'
+  import { t } from '../i18n/i18n.svelte.js'
 
   let { name, hubs = [], sessions = [] } = $props()
   let hub = $derived(hubs.find((h) => h.name === name))
   let s = $derived(sessions.find((x) => x.hub === name))
 </script>
 
-<p><a href="#/hubs">← Huby</a></p>
+<p><a href="#/hubs">← {t('nav.hubs')}</a></p>
 
 {#if !hub}
-  <div class="card"><p class="muted">Nie ma huba „{name}”.</p></div>
+  <div class="card"><p class="muted">{t('hub.notFound', { name })}</p></div>
 {:else}
   <div class="card">
     <h2>{hub.name} <span class="chip" class:ok={hub.online}>{hub.online ? 'online' : 'offline'}</span></h2>
     <dl>
-      <dt>Adres w tunelu</dt><dd>{hub.tunnel_ip}</dd>
-      <dt>Klucz publiczny</dt><dd><code>{hub.public_key}</code></dd>
+      <dt>{t('hub.tunnelIp')}</dt><dd>{hub.tunnel_ip}</dd>
+      <dt>{t('hub.publicKey')}</dt><dd><code>{hub.public_key}</code></dd>
       {#if s}
-        <dt>Od huba / do huba</dt><dd>{mbps(s.rx_rate)} / {mbps(s.tx_rate)}</dd>
-        <dt>Dane od / do huba</dt><dd>{bytes(s.rx_bytes)} / {bytes(s.tx_bytes)}</dd>
-        <dt>Tryb</dt><dd>{s.bond.mode || '—'}, nadmiarowość {s.bond.redundancy || '—'}{s.bond.redundant ? ' (aktywna)' : ''}</dd>
-        <dt>Kolejka / zgubione / pominięte</dt><dd>{s.bond.queue} / {s.bond.dropped} / {s.bond.skipped}</dd>
-        <dt>Ostatni pakiet</dt><dd>{ago(s.last_seen)}</dd>
+        <dt>{t('hub.rates')}</dt><dd>{mbps(s.rx_rate)} / {mbps(s.tx_rate)}</dd>
+        <dt>{t('hub.bytes')}</dt><dd>{bytes(s.rx_bytes)} / {bytes(s.tx_bytes)}</dd>
+        <dt>{t('hub.mode')}</dt><dd>{s.bond.mode || '—'}, {t('hub.redundancy')} {s.bond.redundancy || '—'}{s.bond.redundant ? t('hub.redundantNow') : ''}</dd>
+        <dt>{t('hub.queue')}</dt><dd>{s.bond.queue} / {s.bond.dropped} / {s.bond.skipped}</dd>
+        <dt>{t('hub.lastPacket')}</dt><dd>{ago(s.last_seen)}</dd>
       {/if}
     </dl>
   </div>
 
   <div class="card">
-    <h2>Ścieżki (na żywo)</h2>
+    <h2>{t('hub.paths')}</h2>
     {#if !s || !s.paths?.length}
-      <p class="muted">Hub nie ma teraz żadnej ścieżki.</p>
+      <p class="muted">{t('hub.noPaths')}</p>
     {:else}
       <div class="scroll">
         <table>
           <thead>
             <tr>
-              <th>Relay</th><th>Adres widziany</th><th>Transport</th><th>Stan</th><th>Priorytet</th>
-              <th>RTT</th><th>Jitter</th><th>Straty</th><th>Do huba</th><th>Od huba</th><th>MTU</th>
+              <th>Relay</th><th>{t('hub.col.addr')}</th><th>Transport</th><th>{t('hubs.col.state')}</th><th>{t('hub.col.prio')}</th>
+              <th>RTT</th><th>Jitter</th><th>{t('hub.col.loss')}</th><th>{t('hub.toHub')}</th><th>{t('hub.fromHub')}</th><th>MTU</th>
             </tr>
           </thead>
           <tbody>
             {#each s.paths as p (p.id)}
               <tr>
-                <td>{p.name || `ścieżka ${p.id}`}</td>
+                <td>{p.name || t('hub.pathN', { n: p.id })}</td>
                 <td>{p.addr}</td>
                 <td>{p.stats.stream ? 'TCP/WSS' : 'UDP'}</td>
                 <td><span class="chip" class:ok={p.stats.state === 'alive'} class:bad={p.stats.state === 'dead'}>{pathState(p.stats.state)}</span></td>

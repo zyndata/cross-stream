@@ -18,6 +18,15 @@ fi
 
 if [ "${1:-}" = "--uninstall" ]; then
 	systemctl disable --now xs-hubd.service 2>/dev/null || true
+	# Leftovers of a crashed xs-hubd (a clean stop removes them itself): the
+	# own-traffic rules would keep sending the laptop's traffic to table 100.
+	ip rule del lookup main suppress_prefixlength 0 priority 101 2>/dev/null || true
+	ip rule del not fwmark 0x5853 lookup 100 priority 102 2>/dev/null || true
+	for dev in $(ip rule show priority 99 2>/dev/null | sed -n 's/.* oif \([^ ]*\) .*lookup main.*/\1/p'); do
+		ip rule del oif "$dev" lookup main priority 99 2>/dev/null || true
+	done
+	nft delete table ip6 crossstream_hub 2>/dev/null || true
+	nft delete table ip crossstream_hub 2>/dev/null || true
 	rm -f /etc/systemd/system/xs-hubd.service /usr/local/bin/xs-hubd /usr/local/bin/xs-hubctl "$rules"
 	systemctl daemon-reload
 	echo "removed xs-hubd (kept /var/lib/crossstream, /etc/default/xs-hubd and group crossstream)"

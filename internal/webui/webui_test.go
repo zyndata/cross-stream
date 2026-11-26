@@ -277,7 +277,7 @@ func TestHeadersAndDeny(t *testing.T) {
 
 func TestStatic(t *testing.T) {
 	e := newEnv(t)
-	if w := e.do("GET", "/", "", "", ""); w.Code != 200 || !strings.Contains(w.Body.String(), "nie został zbudowany") {
+	if w := e.do("GET", "/", "", "", ""); w.Code != 200 || !strings.Contains(w.Body.String(), "not built") {
 		t.Fatalf("placeholder: %d %s", w.Code, w.Body)
 	}
 	assets := fstest.MapFS{

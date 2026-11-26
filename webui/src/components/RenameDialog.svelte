@@ -1,17 +1,18 @@
 <script>
   import { untrack } from 'svelte'
   import ConfirmDialog from './ConfirmDialog.svelte'
+  import { t } from '../i18n/i18n.svelte.js'
 
   let { name, onrename, onclose } = $props()
   let newName = $state(untrack(() => name)) // the dialog edits a copy
 </script>
 
-<ConfirmDialog title="Zmień nazwę huba" yes="Zmień" no="Anuluj" onyes={() => newName.trim() && onrename(newName.trim())} onno={onclose}>
+<ConfirmDialog title={t('rename.title')} yes={t('rename.yes')} no={t('common.cancel')} onyes={() => newName.trim() && onrename(newName.trim())} onno={onclose}>
   <label>
-    Nowa nazwa dla <b>{name}</b>
+    {t('rename.label')} <b>{name}</b>
     <input bind:value={newName} maxlength="64" />
   </label>
-  <p class="muted small">Hub połączony pod starą nazwą rozłączy się i od razu połączy pod nową (klucz i adres w tunelu zostają).</p>
+  <p class="muted small">{t('rename.hint')}</p>
 </ConfirmDialog>
 
 <style>

@@ -1,6 +1,7 @@
 <script>
   import Chart from './Chart.svelte'
   import { mbps } from '../lib/format.js'
+  import { t } from '../i18n/i18n.svelte.js'
 
   let { history = [], sample = null } = $props()
   let perHub = $derived(
@@ -12,28 +13,28 @@
 
 <div class="tiles">
   <div class="card tile">
-    <div class="muted small">Huby online</div>
+    <div class="muted small">{t('dash.online')}</div>
     <div class="big">{sample ? sample.online : '—'} <span class="muted">/ {sample ? sample.total : '—'}</span></div>
   </div>
   <div class="card tile">
-    <div class="muted small">Od hubów (upload)</div>
+    <div class="muted small">{t('dash.fromHubs')}</div>
     <div class="big up">{mbps(sample?.rx)}</div>
   </div>
   <div class="card tile">
-    <div class="muted small">Do hubów (download)</div>
+    <div class="muted small">{t('dash.toHubs')}</div>
     <div class="big down">{mbps(sample?.tx)}</div>
   </div>
 </div>
 
-<Chart {history} />
+<Chart {history} title={t('chart.title')} />
 
 <div class="card">
-  <h2>Przepustowość hubów (teraz)</h2>
+  <h2>{t('dash.perHub')}</h2>
   {#if perHub.length === 0}
-    <p class="muted">Żaden hub nie jest połączony.</p>
+    <p class="muted">{t('dash.none')}</p>
   {:else}
     <table>
-      <thead><tr><th>Hub</th><th>Od huba</th><th>Do huba</th></tr></thead>
+      <thead><tr><th>Hub</th><th>{t('hub.fromHub')}</th><th>{t('hub.toHub')}</th></tr></thead>
       <tbody>
         {#each perHub as h (h.name)}
           <tr><td><a href="#/hubs/{encodeURIComponent(h.name)}">{h.name}</a></td><td>{mbps(h.rx)}</td><td>{mbps(h.tx)}</td></tr>

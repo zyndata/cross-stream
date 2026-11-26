@@ -36,8 +36,10 @@ const usage = `usage: xs-hubctl [-dir path] [-socket path] <command>
                                      rate limit (0 = none), cap (0 = none), direction
                                      modes on|backup_only|off
   settings [-redundancy off|auto|on] [-mode max_throughput|min_latency] [-aggregation=true|false]
-           [-overflow-mbps n] [-pep off|on] [-pep-exclude list]
-                                     show the hub-wide bonding settings, or change them
+           [-overflow-mbps n] [-pep off|on] [-pep-exclude list] [-own-traffic on|off]
+                                     show the hub-wide settings, or change them (own traffic:
+                                     this laptop's apps through CrossStream; open connections
+                                     restart once)
   speedtest [-path relay|-all] [-dir down|up|both] [-secs 10] [-max-mb 20] [-results]
                                      measure raw relay capacity (uses the relays' mobile data:
                                      up to max-mb per relay and direction), or list results
@@ -150,7 +152,8 @@ func run(args []string) error {
 
 func enrollCmd(ctx context.Context, dir, sock string, args []string, log *slog.Logger) error {
 	fs := flag.NewFlagSet("enroll", flag.ContinueOnError)
-	via := fs.String("via", "", "local interface to reach the server through (default: routing table)")
+	via := fs.String("via", "", "send from this interface's IPv4 address (the route still follows the "+
+		"routing table; default: routing table)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -165,6 +168,10 @@ func enrollCmd(ctx context.Context, dir, sock string, args []string, log *slog.L
 		return err
 	}
 	e, err := hub.EnrollWithCode(ctx, dir, fs.Arg(0), conn, version, log)
+	if errors.Is(err, hub.ErrNoResponse) {
+		// same hint as the daemon gives without a phone (field test 2026-11-25)
+		return fmt.Errorf("enroll: %w", hub.ErrNoAnswerHere)
+	}
 	if err != nil {
 		return err
 	}

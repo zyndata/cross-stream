@@ -1,6 +1,7 @@
 <script>
   import { onMount } from 'svelte'
   import { api, errorText } from '../lib/api.js'
+  import { t } from '../i18n/i18n.svelte.js'
 
   let { notify } = $props()
   let pref = $state(null)
@@ -17,7 +18,7 @@
     try {
       await api.setClosePref(v)
       pref = v
-      notify('Zapisano')
+      notify(t('common.saved'))
     } catch (e) {
       notify(errorText(e), true)
     }
@@ -26,12 +27,12 @@
 
 {#if pref}
   <div class="card">
-    <h2>Zamykanie okna</h2>
-    <p class="muted small">Co zrobić z hubem (usługa xs-hubd), gdy zamykasz to okno.</p>
-    {#each [['ask', 'Pytaj za każdym razem'], ['keep', 'Zostaw hub w tle'], ['stop', 'Zatrzymaj hub (hotspot się wyłączy)']] as [v, label]}
+    <h2>{t('close.title')}</h2>
+    <p class="muted small">{t('close.hint')}</p>
+    {#each ['ask', 'keep', 'stop'] as v}
       <label class="check">
         <input type="radio" name="onclose" checked={pref === v} onchange={() => save(v)} />
-        {label}
+        {t('close.pref.' + v)}
       </label>
     {/each}
   </div>

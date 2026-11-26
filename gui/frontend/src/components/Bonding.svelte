@@ -2,18 +2,24 @@
   import { api, errorText } from '../lib/api.js'
   import { mbps } from '../lib/fmt.js'
   import ConfirmDialog from './ConfirmDialog.svelte'
+  import { t, num } from '../i18n/i18n.svelte.js'
 
   let { view, notify } = $props()
 
+  // [value, dictionary key] — label at key, hint at key + 'Hint'.
   const modes = [
-    ['max_throughput', 'Maksymalna przepustowość', 'Wszystkie telefony razem — najszybsze pobieranie i wysyłanie.'],
-    ['min_latency', 'Minimalne opóźnienie', 'Gry i rozmowy: małe pakiety idą najszybszym telefonem i w dwóch kopiach.'],
+    ['max_throughput', 'bond.mode.max'],
+    ['min_latency', 'bond.mode.min'],
   ]
   const redundancies = [
-    ['off', 'Wył.', 'Każdy pakiet jedną drogą. Najmniej danych z telefonów.'],
-    ['auto', 'Auto', 'Gdy łącze gubi pakiety lub się waha, rozmowy i gry (UDP) idą w dwóch kopiach.'],
-    ['on', 'Wł.', 'Każdy pakiet dwiema drogami: odporne na straty, ale zużywa 2× więcej danych z telefonów.'],
+    ['off', 'bond.red.off'],
+    ['auto', 'bond.red.auto'],
+    ['on', 'bond.red.on'],
   ]
+  const hintOf = (list, v) => {
+    const k = list.find(([x]) => x === v)?.[1]
+    return k ? t(k + 'Hint') : ''
+  }
 
   const secs = 10
   const maxMB = 20
@@ -23,8 +29,7 @@
   let result = $state(null)
 
   let connected = $derived(view.relays.filter((r) => r.connected))
-  const atLeastHint = 'Co najmniej tyle: łącze przyjęło wszystko, co test wysłał'
-  const rate = (p) => (p.at_least ? '≥ ' : '') + p.mbps.toFixed(1)
+  const rate = (p) => (p.at_least ? '≥ ' : '') + num(p.mbps, 1)
   const anyAtLeast = (dir) => result?.paths?.some((p) => p.dir === dir && p.at_least)
   const retryFactor = 3 // hub.RetryFactor: a path faster than the first round is measured again
   let costMB = $derived((target ? 1 : connected.length) * maxMB * 2)
@@ -79,7 +84,7 @@
     result = null
     try {
       result = await api.speedTest({ relay: target, dir: 'both', secs, max_mb: maxMB })
-      notify('Test łączy zakończony')
+      notify(t('bond.test.done'))
     } catch (e) {
       notify(errorText(e), true)
     }
@@ -95,71 +100,70 @@
 </script>
 
 <div class="card bonding">
-  <h2>Tryb łączenia</h2>
+  <h2>{t('bond.title')}</h2>
   <div class="grid">
     <div>
-      <div class="label">Tryb</div>
+      <div class="label">{t('bond.mode')}</div>
       <div class="seg">
-        {#each modes as [v, label, hint]}
+        {#each modes as [v, key]}
           <button
             class:active={view.bond_mode === v}
-            title={hint}
-            onclick={() => setBond(v, '', `Tryb: ${label.toLowerCase()}`)}>{label}</button>
+            title={t(key + 'Hint')}
+            onclick={() => setBond(v, '', t('bond.modeToast', { mode: t(key).toLowerCase() }))}>{t(key)}</button>
         {/each}
       </div>
-      <p class="muted small">{modes.find(([v]) => v === view.bond_mode)?.[2] ?? ''}</p>
+      <p class="muted small">{hintOf(modes, view.bond_mode)}</p>
     </div>
     <div>
       <div class="label">
-        Redundancja
-        {#if view.redundant}<span class="chip warn">dubluje teraz</span>{/if}
+        {t('bond.redundancy')}
+        {#if view.redundant}<span class="chip warn">{t('bond.redNow')}</span>{/if}
       </div>
       <div class="seg">
-        {#each redundancies as [v, label, hint]}
+        {#each redundancies as [v, key]}
           <button
             class:active={view.redundancy === v}
-            title={hint}
-            onclick={() => setBond('', v, `Redundancja: ${label.toLowerCase()}`)}>{label}</button>
+            title={t(key + 'Hint')}
+            onclick={() => setBond('', v, t('bond.redToast', { mode: t(key).toLowerCase() }))}>{t(key)}</button>
         {/each}
       </div>
-      <p class="muted small">{redundancies.find(([v]) => v === view.redundancy)?.[2] ?? ''}</p>
+      <p class="muted small">{hintOf(redundancies, view.redundancy)}</p>
     </div>
     <div>
       <div class="label">
-        Przyspieszanie TCP
-        {#if pepOn && view.pep?.available}<span class="chip">{view.pep.streams} połączeń</span>{/if}
-        {#if pepOn && view.pep && !view.pep.available && view.tunnel_up}<span class="chip warn">serwer nie obsługuje</span>{/if}
+        {t('bond.pep')}
+        {#if pepOn && view.pep?.available}<span class="chip">{t('bond.pepStreams', { n: view.pep.streams })}</span>{/if}
+        {#if pepOn && view.pep && !view.pep.available && view.tunnel_up}<span class="chip warn">{t('bond.pepNoServer')}</span>{/if}
       </div>
       <div class="seg">
-        <button class:active={!pepOn} onclick={() => setPEP(false, false, 'Przyspieszanie TCP wyłączone')}>Wył.</button>
-        <button class:active={pepOn} onclick={() => setPEP(true, false, 'Przyspieszanie TCP włączone')}>Wł.</button>
+        <button class:active={!pepOn} onclick={() => setPEP(false, false, t('bond.pepOffToast'))}>{t('common.off')}</button>
+        <button class:active={pepOn} onclick={() => setPEP(true, false, t('bond.pepOnToast'))}>{t('common.on')}</button>
       </div>
       <p class="muted small">
-        Hub i serwer kończą połączenia TCP za klienta, a przez telefony idą tylko dane. Pomaga na łączach ze stratami
-        i różnym opóźnieniem. Działające połączenia zostają w dotychczasowym trybie.
+        {t('bond.pepHint')}
       </p>
       <div class="test">
         <input
           type="text"
-          placeholder="wyjątki: 22, 5000-5100, 10.0.0.0/8"
-          title="Porty, zakresy portów i sieci IPv4, które omijają przyspieszanie"
+          placeholder={t('bond.pepExcludePh')}
+          title={t('bond.pepExcludeHint')}
           bind:value={pepExclude}
           disabled={!pepLoaded} />
-        <button disabled={!pepLoaded} onclick={() => setPEP(pepOn, true, 'Zapisano wyjątki')}>Zapisz</button>
+        <button disabled={!pepLoaded} onclick={() => setPEP(pepOn, true, t('bond.pepExcludeSaved'))}>{t('common.save')}</button>
       </div>
     </div>
     <div>
-      <div class="label">Test łączy</div>
+      <div class="label">{t('bond.test')}</div>
       <div class="test">
         <select bind:value={target} disabled={running}>
-          <option value="">wszystkie telefony naraz</option>
+          <option value="">{t('bond.test.all')}</option>
           {#each connected as r (r.id)}<option value={r.name}>{r.name}</option>{/each}
         </select>
         <button class="primary" disabled={running || view.testing || connected.length === 0} onclick={() => (asking = true)}>
-          {running ? 'Testowanie…' : 'Testuj łącza'}
+          {running ? t('bond.test.running') : t('bond.test.run')}
         </button>
       </div>
-      <p class="muted small">Mierzy surową przepustowość każdego telefonu ({secs} s pobierania + {secs} s wysyłania).</p>
+      <p class="muted small">{t('bond.test.hint', { secs })}</p>
     </div>
   </div>
 
@@ -167,26 +171,26 @@
     <table>
       <thead>
         <tr>
-          <th>Telefon</th>
+          <th>{t('common.phone')}</th>
           <th class="num">↓ Mb/s</th>
           <th class="num">↑ Mb/s</th>
           <th class="num">RTT</th>
-          <th class="num">Straty</th>
+          <th class="num">{t('bond.test.loss')}</th>
         </tr>
       </thead>
       <tbody>
         {#each rows as r (r.name)}
           <tr>
             <td>{r.name || '—'}</td>
-            <td class="num down" title={r.down?.at_least ? atLeastHint : ''}>{r.down ? rate(r.down) : '—'}</td>
-            <td class="num up" title={r.up?.at_least ? atLeastHint : ''}>{r.up ? rate(r.up) : '—'}</td>
+            <td class="num down" title={r.down?.at_least ? t('bond.test.atLeast') : ''}>{r.down ? rate(r.down) : '—'}</td>
+            <td class="num up" title={r.up?.at_least ? t('bond.test.atLeast') : ''}>{r.up ? rate(r.up) : '—'}</td>
             <td class="num">{r.up?.rtt_ms ?? r.down?.rtt_ms ?? '—'} ms</td>
-            <td class="num">{(((r.up?.loss ?? r.down?.loss) || 0) * 100).toFixed(1)}%</td>
+            <td class="num">{num(((r.up?.loss ?? r.down?.loss) || 0) * 100, 1)}%</td>
           </tr>
         {/each}
         {#if !result.relay}
           <tr class="sum">
-            <td>Razem</td>
+            <td>{t('bond.test.total')}</td>
             <td class="num down">{anyAtLeast('down') ? '≥ ' : ''}{mbps(result.down_mbps)}</td>
             <td class="num up">{anyAtLeast('up') ? '≥ ' : ''}{mbps(result.up_mbps)}</td>
             <td></td>
@@ -196,19 +200,15 @@
       </tbody>
     </table>
     {#if result.paths?.some((p) => p.at_least)}
-      <p class="muted small">≥ — łącze przyjęło wszystko, co test wysłał, także w powtórce z większym limitem
-        danych, więc jest co najmniej tak szybkie.</p>
+      <p class="muted small">{t('bond.test.atLeastNote')}</p>
     {/if}
   {/if}
 </div>
 
 {#if asking}
-  <ConfirmDialog title="Testować łącza?" yes="Testuj" onyes={runTest} onno={() => (asking = false)}>
-    Test zużyje zwykle do <b>{costMB} MB</b> danych komórkowych
-    {target ? `telefonu ${target}` : `z ${connected.length} telefonów (po ${maxMB * 2} MB z każdego)`}.
-    Łącze szybsze, niż zmierzy pierwszy pomiar, jest mierzone jeszcze raz z większym limitem — wtedy
-    najwyżej <b>{costMaxMB} MB</b> łącznie.
-    To dane znajomych — upewnij się, że się zgadzają. W czasie testu połączenie przez ten telefon zwolni.
+  <ConfirmDialog title={t('bond.test.ask')} yes={t('bond.test.yes')} onyes={runTest} onno={() => (asking = false)}>
+    {t('bond.test.cost1')} <b>{costMB} MB</b> {target ? t('bond.test.costOne', { name: target }) : t('bond.test.costAll', { n: connected.length, each: maxMB * 2 })}.
+    {t('bond.test.cost2')} <b>{costMaxMB} MB</b> {t('bond.test.cost3')}
   </ConfirmDialog>
 {/if}
 

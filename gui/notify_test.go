@@ -9,7 +9,7 @@ import (
 
 func TestNotifier(t *testing.T) {
 	var sent []string
-	n := &notifier{path: filepath.Join(t.TempDir(), "n.json"), prefs: NotifyPrefs{}, last: map[string]time.Time{},
+	n := &notifier{tr: testTexts(langPL), path: filepath.Join(t.TempDir(), "n.json"), prefs: NotifyPrefs{}, last: map[string]time.Time{},
 		send: func(title, body string) error { sent = append(sent, title+"|"+body); return nil }}
 	now := time.Unix(1_000_000, 0)
 	left := hubEvent{Type: "relay_left", Relay: "r1", Name: "anna", Reason: "leaving: limit"}
@@ -41,12 +41,13 @@ func TestNotifier(t *testing.T) {
 }
 
 func TestEventText(t *testing.T) {
+	pl := testTexts(langPL)
 	for _, typ := range notifyTypes {
-		if title, body := eventText(hubEvent{Type: typ, Name: "anna", Mode: "DIRECT", Value: 5}); title == "" || body == "" {
+		if title, body := eventText(pl, hubEvent{Type: typ, Name: "anna", Mode: "DIRECT", Value: 5}); title == "" || body == "" {
 			t.Errorf("%s: no text", typ)
 		}
 	}
-	if _, body := eventText(hubEvent{Type: "mode_changed", Mode: "DIRECT"}); !strings.Contains(body, "bezpośredni") {
+	if _, body := eventText(pl, hubEvent{Type: "mode_changed", Mode: "DIRECT"}); !strings.Contains(body, "bezpośredni") {
 		t.Errorf("mode text %q", body)
 	}
 	for _, tc := range []struct {
@@ -58,14 +59,14 @@ func TestEventText(t *testing.T) {
 		{80, 30, "Test łączy zakończony: pobieranie 80 Mb/s, wysyłanie 30 Mb/s."},
 		{0, 0, "Test łączy zakończony: brak wyniku."},
 	} {
-		if _, body := eventText(hubEvent{Type: "speedtest_done", Value: tc.down, Up: tc.up}); body != tc.want {
+		if _, body := eventText(pl, hubEvent{Type: "speedtest_done", Value: tc.down, Up: tc.up}); body != tc.want {
 			t.Errorf("speed %d/%d: %q", tc.down, tc.up, body)
 		}
 	}
-	if _, body := eventText(hubEvent{Type: "relay_left", Reason: "control lost"}); !strings.Contains(body, "utrata") {
+	if _, body := eventText(pl, hubEvent{Type: "relay_left", Reason: "control lost"}); !strings.Contains(body, "utrata") {
 		t.Errorf("left text %q", body)
 	}
-	if _, body := eventText(hubEvent{Type: "relay_left", Relay: "u2", Name: "Modem", Reason: "leaving: limit"}); body != "Łącze lokalne rozłączone (limit danych wyczerpany)." {
+	if _, body := eventText(pl, hubEvent{Type: "relay_left", Relay: "u2", Name: "Modem", Reason: "leaving: limit"}); body != "Łącze lokalne rozłączone (limit danych wyczerpany)." {
 		t.Errorf("local link text %q", body)
 	}
 }

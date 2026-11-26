@@ -3,6 +3,24 @@
 All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [0.11.0] - 2026-11-26
+
+### Added
+
+- **phase-21:** Hub laptop's own traffic through CrossStream
+- **phase-22:** English and Polish in the hub GUI and the server panel
+- **relay:** Rename saved hubs on the phone
+
+### Fixed
+
+- **server:** A new code from an enrolled hub renames it
+- **hub:** Own traffic keeps NetworkManager's per-device check working
+- **server:** A stalled TCP connection no longer drops the download
+- Terminal tools English only (captive hint)
+- **pairing:** A re-paired relay keeps its id and usage history
+- **relay:** Join the chosen hub when it comes into range; "Switch now"
+- **hotspot:** Linux reconnects the Wi-Fi network the hotspot took
+
 ## [0.10.0] - 2026-11-22
 
 ### Added

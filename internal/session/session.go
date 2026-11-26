@@ -44,6 +44,8 @@ type Path struct {
 	Conn     Sender
 	LastRecv time.Time
 	Stream   bool // Conn is a reliable stream (TCP/WSS)
+
+	streams []streamConn // stream path: its live connections (streams.go)
 }
 
 // streamer is implemented by senders over a reliable stream transport.
@@ -103,6 +105,7 @@ type Session struct {
 
 	rxBytes atomic.Uint64
 	txBytes atomic.Uint64
+	rr      atomic.Uint32 // round-robin over a stream path's connections (streams.go)
 }
 
 // New returns a session without keys or paths. Call Start to run its timers.
@@ -226,7 +229,9 @@ func (s *Session) setPathLocked(id uint8, addr netip.AddrPort, conn Sender) bool
 	now := s.now()
 	p, ok := s.paths[id]
 	if !ok {
-		s.paths[id] = &Path{ID: id, Addr: addr, Conn: conn, LastRecv: now, Stream: isStream(conn)}
+		p = &Path{ID: id, Addr: addr, Conn: conn, LastRecv: now, Stream: isStream(conn)}
+		p.seeStreamLocked(conn, addr, now)
+		s.paths[id] = p
 		return true
 	}
 	sameStreamIP := p.Stream && isStream(conn) && p.Addr.Addr() == addr.Addr()
@@ -234,7 +239,9 @@ func (s *Session) setPathLocked(id uint8, addr netip.AddrPort, conn Sender) bool
 	p.Addr, p.Conn, p.LastRecv = addr, conn, now
 	if changed {
 		p.Stream = isStream(conn)
+		p.streams = nil
 	}
+	p.seeStreamLocked(conn, addr, now)
 	return changed
 }
 
@@ -311,6 +318,7 @@ func (s *Session) open(h wire.Header, packet []byte, from netip.AddrPort, conn S
 	}
 	if p := s.paths[h.PathID]; known && !newest {
 		p.LastRecv = now
+		p.seeStreamLocked(conn, from, now)
 	} else {
 		changed = s.setPathLocked(h.PathID, from, conn)
 	}
@@ -337,12 +345,16 @@ func (s *Session) Send(frames ...wire.Frame) error {
 
 // SendOn encrypts frames into one DATA packet and sends it on path id.
 func (s *Session) SendOn(id uint8, frames ...wire.Frame) error {
+	var arr [maxStreams]Sender
+	var conns []Sender
 	s.mu.Lock()
 	ks := s.cur
 	pp := s.paths[id]
 	var p Path
 	if pp != nil {
 		p = *pp
+		p.streams = nil // owned by the session; conns is this send's copy
+		conns = pp.freshStreamsLocked(s.now(), arr[:0])
 	}
 	s.mu.Unlock()
 	if ks == nil {
@@ -366,7 +378,7 @@ func (s *Session) SendOn(id uint8, frames ...wire.Frame) error {
 	buf := wire.AppendHeader(make([]byte, 0, wire.HeaderLen+len(plain)+crypto.TagLen),
 		wire.Header{Type: wire.TypeData, SessionID: s.id, PathID: p.ID, Counter: counter})
 	buf = ks.send.Seal(buf, buf[:wire.HeaderLen], plain, counter)
-	if _, err := p.Conn.WriteToUDPAddrPort(buf, p.Addr); err != nil {
+	if err := s.write(p, conns, buf); err != nil {
 		return fmt.Errorf("session send on path %d: %w", p.ID, err)
 	}
 	s.txBytes.Add(uint64(len(buf)))

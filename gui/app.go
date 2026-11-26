@@ -55,6 +55,8 @@ type App struct {
 	svc *service
 	// upd checks for and installs a newer release (updates.go).
 	upd *updater
+	// tr is the GUI language and its texts (lang.go).
+	tr *texts
 	// openURL replaces runtime.BrowserOpenURL (tests).
 	openURL func(url string)
 
@@ -72,7 +74,8 @@ type App struct {
 
 // NewApp returns the backend for the xs-hubd socket at sock.
 func NewApp(sock string, log *slog.Logger) *App {
-	return &App{sock: sock, log: log, last: View{State: stateNoDaemon, Relays: []RelayView{}, Uplinks: []UplinkView{}}, notify: newNotifier(), svc: newService(), upd: newUpdater(version),
+	tr := newTexts()
+	return &App{tr: tr, sock: sock, log: log, last: View{State: stateNoDaemon, Relays: []RelayView{}, Uplinks: []UplinkView{}}, notify: newNotifier(tr), svc: newService(), upd: newUpdater(version, tr),
 		wake: make(chan struct{}, 1), emit: func(ctx context.Context, v View) { runtime.EventsEmit(ctx, EventView, v) }}
 }
 
@@ -260,6 +263,12 @@ func (a *App) SetPEP(on bool, exclude []string) error {
 		p["pep_exclude"] = exclude
 	}
 	return a.call(callTimeout, methodSettingsSet, p, nil)
+}
+
+// SetOwnTraffic turns this laptop's own traffic through CrossStream on or
+// off (Linux; xs-hubd refuses "off" on Windows).
+func (a *App) SetOwnTraffic(on bool) error {
+	return a.call(callTimeout, methodSettingsSet, map[string]any{"own_traffic": on}, nil)
 }
 
 // SpeedTest measures the relays' raw capacity (uses their mobile data).

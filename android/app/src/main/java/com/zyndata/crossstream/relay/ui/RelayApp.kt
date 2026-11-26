@@ -111,6 +111,9 @@ fun RelayApp() {
             } else {
                 HubDetailScreen(hub, hubState(hub, state, null), onBack = { screen = Screen.Home }, onUse = { use ->
                     scope.launch { app.repo.setHubUse(hub.id, use) }
+                }, onRename = { label ->
+                    scope.launch { app.repo.renameHub(hub.id, label) }
+                    app.log.i("RelayApp", "hub renamed: ${hub.name} -> ${SavedHub.cleanLabel(label).ifEmpty { "(own name)" }}")
                 }, onChoose = { on ->
                     scope.launch { app.repo.setPreferredHub(if (on) hub.id else "") }
                     app.log.i("RelayApp", if (on) "hub chosen: ${hub.name}" else "hub choice: automatic")
@@ -266,6 +269,13 @@ private fun HomeScreen(
                 .sortedWith(compareBy<SavedHub> { states[it.id] == HubState.AWAY }.thenByDescending { it.lastSeen })
             val active = online.firstOrNull { it.preferred }?.id
                 ?: online.firstOrNull { states[it.id] == HubState.CONNECTED || states[it.id] == HubState.CONNECTING }?.id
+            val offer = HubPicker.switchOffer(hubs, state.hubId, state.phase == Phase.RELAYING || state.phase == Phase.CONNECTING)
+            if (offer != null) {
+                // The chosen hub is not the one this phone shares with: switch by hand at once.
+                OutlinedButton(onClick = { RelayStateHolder.requestSwitch() }, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.hub_switch_to, offer.shownName))
+                }
+            }
             online.forEach { hub ->
                 HubCard(hub, states.getValue(hub.id), selected = if (online.size > 1) hub.id == active else null,
                     onSelect = { onChoose(hub.id) }) { onHub(hub.id) }
@@ -280,7 +290,7 @@ private fun HomeScreen(
 
 @Composable
 private fun statusText(state: RelayUiState, enabled: Boolean, hubs: List<SavedHub>): String {
-    val name = hubs.firstOrNull { it.id == state.hubId }?.name.orEmpty()
+    val name = hubs.firstOrNull { it.id == state.hubId }?.shownName.orEmpty()
     return when {
         !enabled -> stringResource(R.string.status_off)
         state.wifiOff -> stringResource(R.string.status_wifi_off)
@@ -322,7 +332,7 @@ private fun HubCard(hub: SavedHub, state: HubState, selected: Boolean? = null, o
             }
             Column(Modifier.weight(1f)) {
                 Text(
-                    if (hub.preferred) stringResource(R.string.hub_name_chosen, hub.name) else hub.name,
+                    if (hub.preferred) stringResource(R.string.hub_name_chosen, hub.shownName) else hub.shownName,
                     style = MaterialTheme.typography.titleMedium,
                 )
                 Text(stringResource(R.string.hub_shared, formatData(hub.sharedBytes)), style = MaterialTheme.typography.bodySmall)

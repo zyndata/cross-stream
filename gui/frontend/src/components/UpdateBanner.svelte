@@ -1,6 +1,7 @@
 <script>
   // "New version available" bar above every view (also when xs-hubd is not running).
   import { api, errorText } from '../lib/api.js'
+  import { t } from '../i18n/i18n.svelte.js'
   import { upd } from '../lib/update.svelte.js'
 
   let { notify } = $props()
@@ -20,19 +21,18 @@
 {#if show}
   <div class="banner info">
     {#if v.state === 'downloading'}
-      Pobieranie CrossStream {v.available.tag}… <b>{v.progress}%</b>
+      {t('upd.downloading', { tag: v.available.tag })} <b>{v.progress}%</b>
     {:else if v.state === 'installing'}
-      Instalowanie {v.available.tag}: potwierdź uprawnienia administratora. Hub uruchomi się ponownie, a to okno
-      otworzy się w nowej wersji.
+      {t('upd.installingBanner', { tag: v.available.tag })}
     {:else}
       <span class="text">
-        <b>Dostępna nowa wersja {v.available.tag}</b> (masz {v.version}).
+        <b>{t('upd.newVersion', { tag: v.available.tag })}</b> {t('upd.youHave', { version: v.version })}
         {#if v.error}<span class="err">{v.error}</span>{/if}
       </span>
       <span class="actions">
-        {#if v.can_install}<button class="primary" onclick={() => (upd.confirm = true)}>Zainstaluj</button>{/if}
-        <button onclick={() => api.openURL(v.available.page)}>Co nowego</button>
-        <button class="x" title="Nie pokazuj dla tej wersji" aria-label="Zamknij" onclick={dismiss}>×</button>
+        {#if v.can_install}<button class="primary" onclick={() => (upd.confirm = true)}>{t('upd.install')}</button>{/if}
+        <button onclick={() => api.openURL(v.available.page)}>{t('upd.whatsNew')}</button>
+        <button class="x" title={t('upd.dismiss')} aria-label={t('common.close')} onclick={dismiss}>×</button>
       </span>
     {/if}
   </div>

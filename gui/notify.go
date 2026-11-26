@@ -42,6 +42,7 @@ type NotifyPrefs map[string]bool
 // notifier turns hub events into OS notifications.
 type notifier struct {
 	path string // prefs file ("" = not saved)
+	tr   *texts
 	send func(title, body string) error
 
 	mu    sync.Mutex
@@ -49,8 +50,8 @@ type notifier struct {
 	last  map[string]time.Time // type/relay → last notification
 }
 
-func newNotifier() *notifier {
-	n := &notifier{prefs: NotifyPrefs{}, last: make(map[string]time.Time),
+func newNotifier(tr *texts) *notifier {
+	n := &notifier{tr: tr, prefs: NotifyPrefs{}, last: make(map[string]time.Time),
 		send: func(title, body string) error { return beeep.Notify(title, body, "") }}
 	if dir, err := os.UserConfigDir(); err == nil {
 		n.path = filepath.Join(dir, "crossstream", notifyFile)
@@ -106,7 +107,7 @@ func (n *notifier) allow(e hubEvent, now time.Time) bool {
 	}
 	k := e.Type + "/" + e.Relay
 	if e.Relay == "" { // hub-wide events: only a repeat of the same message is noise
-		_, body := eventText(e)
+		_, body := eventText(n.tr, e)
 		k += body
 	}
 	if t, ok := n.last[k]; ok && now.Sub(t) < notifyGap {
@@ -118,96 +119,93 @@ func (n *notifier) allow(e hubEvent, now time.Time) bool {
 
 // handle shows e when allowed; it reports whether a notification was sent.
 func (n *notifier) handle(e hubEvent, now time.Time) bool {
-	title, body := eventText(e)
+	title, body := eventText(n.tr, e)
 	if title == "" || !n.allow(e, now) {
 		return false
 	}
 	return n.send(title, body) == nil
 }
 
-// modeNames are the Polish hub mode names.
-var modeNames = map[string]string{"BONDED": "połączony przez serwer", "DIRECT": "tryb bezpośredni",
-	"CONNECTING": "łączenie", "OFFLINE": "brak telefonów i łączy lokalnych"}
-
-// eventText is the Polish notification for e ("" = no notification).
-func eventText(e hubEvent) (title, body string) {
+// eventText is the notification for e in the active language ("" = no notification).
+func eventText(tr *texts, e hubEvent) (title, body string) {
 	if strings.HasPrefix(e.Relay, "u") { // a local link of the hub (phase 12)
 		switch e.Type {
 		case "relay_joined":
-			return "CrossStream: " + e.Name, "Łącze lokalne połączone."
+			return "CrossStream: " + e.Name, tr.T("go.notify.localJoined", nil)
 		case "relay_left":
-			return "CrossStream: " + e.Name, "Łącze lokalne rozłączone" + localReason(e.Reason) + "."
+			return "CrossStream: " + e.Name, tr.T("go.notify.localLeft", map[string]any{"reason": localReason(tr, e.Reason)})
 		}
 	}
 	who := e.Name
 	if who == "" {
-		who = "Telefon"
+		who = tr.T("go.notify.phone", nil)
 	}
 	switch e.Type {
 	case "relay_joined":
-		return "CrossStream: " + who, "Telefon dołączył i udostępnia dane."
+		return "CrossStream: " + who, tr.T("go.notify.joined", nil)
 	case "relay_left":
-		return "CrossStream: " + who, "Telefon odłączył się" + leftReason(e.Reason) + "."
+		return "CrossStream: " + who, tr.T("go.notify.left", map[string]any{"reason": leftReason(tr, e.Reason)})
 	case "cap_80":
-		return "CrossStream: " + who, fmt.Sprintf("Wykorzystano 80%% limitu %d MB.", e.Value)
+		return "CrossStream: " + who, tr.T("go.notify.cap80", map[string]any{"mb": e.Value})
 	case "cap_100":
-		return "CrossStream: " + who, fmt.Sprintf("Limit %d MB wyczerpany — telefon nie jest już używany.", e.Value)
+		return "CrossStream: " + who, tr.T("go.notify.cap100", map[string]any{"mb": e.Value})
 	case "battery_low":
-		return "CrossStream: " + who, fmt.Sprintf("Słaba bateria telefonu: %d%%.", e.Value)
+		return "CrossStream: " + who, tr.T("go.notify.battery", map[string]any{"pct": e.Value})
 	case "weak_wifi":
-		return "CrossStream: " + who, fmt.Sprintf("Słaby sygnał Wi-Fi do huba (%d dBm) — przybliż telefon.", e.Value)
+		return "CrossStream: " + who, tr.T("go.notify.weakWifi", map[string]any{"dbm": e.Value})
 	case "mode_changed":
-		m := modeNames[e.Mode]
-		if m == "" {
-			m = e.Mode
+		m := e.Mode
+		if k := "go.mode." + e.Mode; tr.T(k, nil) != k {
+			m = tr.T(k, nil)
 		}
-		return "CrossStream", "Tryb huba: " + m + "."
+		return "CrossStream", tr.T("go.notify.mode", map[string]any{"mode": m})
 	case "speedtest_done":
-		return "CrossStream", "Test łączy zakończony: " + speedText(e.Value, e.Up) + "."
+		return "CrossStream", tr.T("go.notify.speed", map[string]any{"result": speedText(tr, e.Value, e.Up)})
 	}
 	return "", ""
 }
 
 // speedText names the measured directions: an upload-only test has no
 // download figure (it said "0 Mb/s pobierania", phase 18).
-func speedText(down, up int) string {
+func speedText(tr *texts, down, up int) string {
+	p := map[string]any{"down": down, "up": up}
 	switch {
 	case down > 0 && up > 0:
-		return fmt.Sprintf("pobieranie %d Mb/s, wysyłanie %d Mb/s", down, up)
+		return tr.T("go.speed.both", p)
 	case up > 0:
-		return fmt.Sprintf("wysyłanie %d Mb/s", up)
+		return tr.T("go.speed.up", p)
 	case down > 0:
-		return fmt.Sprintf("pobieranie %d Mb/s", down)
+		return tr.T("go.speed.down", p)
 	}
-	return "brak wyniku"
+	return tr.T("go.speed.none", nil)
 }
 
-func leftReason(r string) string {
+func leftReason(tr *texts, r string) string {
 	switch r {
 	case "leaving: limit":
-		return " (limit danych wyczerpany)"
+		return tr.T("go.left.limit", nil)
 	case "leaving: battery":
-		return " (słaba bateria)"
+		return tr.T("go.left.battery", nil)
 	case "leaving: user":
-		return " (wyłączony przez właściciela)"
+		return tr.T("go.left.user", nil)
 	case "leaving: no_cellular", "leaving: no_data":
-		return " (brak danych komórkowych)"
+		return tr.T("go.left.noData", nil)
 	case "":
 		return ""
 	}
-	return " (utrata połączenia)"
+	return tr.T("go.left.lost", nil)
 }
 
-func localReason(r string) string {
+func localReason(tr *texts, r string) string {
 	switch r {
 	case "leaving: limit":
-		return " (limit danych wyczerpany)"
+		return tr.T("go.left.limit", nil)
 	case "leaving: off":
-		return " (wyłączone w ustawieniach)"
+		return tr.T("go.local.off", nil)
 	case "leaving: absent":
-		return " (odłączone od laptopa)"
+		return tr.T("go.local.absent", nil)
 	case "connection lost":
-		return " (brak połączenia z serwerem)"
+		return tr.T("go.local.noServer", nil)
 	}
 	return ""
 }

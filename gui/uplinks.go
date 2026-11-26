@@ -69,7 +69,7 @@ type modemInfo struct {
 	RSRP     float64 `json:"rsrp_dbm"`
 }
 
-// UplinkView is one row of the "Łącza lokalne" section.
+// UplinkView is one row of the "Local links" section.
 type UplinkView struct {
 	ID          string       `json:"id"`
 	Name        string       `json:"name"`
@@ -148,11 +148,12 @@ const captiveTimeout = 15 * time.Second
 func (a *App) captiveOpen(r captiveResult) string {
 	switch {
 	case r.State == "open":
-		return "Internet działa — logowanie nie jest potrzebne"
+		return a.tr.T("go.captive.open", nil)
 	case r.State != "captive":
-		return "Brak internetu na tym łączu"
+		return a.tr.T("go.captive.none", nil)
 	case r.RouteErr != "" || r.URL == "":
-		return or(r.Hint, "Zaloguj się w tej sieci na telefonie lub wyłącz hub na chwilę")
+		// r.Hint is xs-hubd's fixed English hint (hub.CaptiveHint): say the same in the UI language.
+		return a.tr.T("go.captive.hint", nil)
 	}
 	if a.openURL != nil {
 		a.openURL(r.URL)

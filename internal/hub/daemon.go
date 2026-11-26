@@ -20,6 +20,7 @@ import (
 	"github.com/zyndata/cross-stream/internal/control"
 	"github.com/zyndata/cross-stream/internal/crypto"
 	"github.com/zyndata/cross-stream/internal/direct"
+	"github.com/zyndata/cross-stream/internal/dns"
 	"github.com/zyndata/cross-stream/internal/hub/hublog"
 	"github.com/zyndata/cross-stream/internal/hub/netcfg"
 	"github.com/zyndata/cross-stream/internal/hub/uplink"
@@ -147,6 +148,7 @@ type Daemon struct {
 	upReg  *uplink.Registry
 	up     uplinkState
 	nftMu  sync.Mutex // serialises netLAN snapshot + ApplyRules (see applyLAN)
+	ensMu  sync.Mutex // one ensureNet at a time (watchdog, path state, enrollment, own traffic); before nftMu
 	hsTry  int        // handshake attempts, rotates the uplink choice (mu)
 	locals map[string]*localPath
 
@@ -185,6 +187,9 @@ type Daemon struct {
 	setMu    sync.Mutex
 	overflow atomic.Uint32            // Mbps
 	settings atomic.Pointer[Settings] // redundancy, mode, aggregation (overflow: above)
+	ownDNS   atomic.Pointer[string]   // OwnDNSResolved / OwnDNSSystem (own traffic on, Linux)
+	dnsSrv   *dns.Server              // hub DNS forwarder (cfg.DNS), set before Run starts goroutines
+	dnsTun   netip.Addr               // tunnel address the forwarder also serves (mu)
 	pepRules atomic.Pointer[pepRules] // parsed Settings.PEPExclude
 	testMu   sync.Mutex               // one speed test at a time
 	gone     map[string]goneInfo
@@ -328,14 +333,17 @@ func (d *Daemon) open() error {
 		d.log.Error("enrollment file unreadable: the hub starts as not enrolled", "err", err)
 	}
 	ip := d.lan.Addr().String()
-	if d.ctlLn, err = net.Listen("tcp4", net.JoinHostPort(ip, strconv.Itoa(cfg.CtlPort))); err != nil {
+	lc := netcfg.ListenConfig() // marked: own traffic must not route the relay LAN into the tunnel
+	if d.ctlLn, err = lc.Listen(context.Background(), "tcp4", net.JoinHostPort(ip, strconv.Itoa(cfg.CtlPort))); err != nil {
 		return fmt.Errorf("control listen: %w", err)
 	}
 	ua := net.UDPAddrFromAddrPort(netip.AddrPortFrom(d.lan.Addr(), uint16(cfg.DataPort)))
-	if d.data, err = net.ListenUDP("udp4", ua); err != nil {
+	pc, err := lc.ListenPacket(context.Background(), "udp4", ua.String())
+	if err != nil {
 		_ = d.ctlLn.Close()
 		return fmt.Errorf("data listen: %w", err)
 	}
+	d.data = pc.(*net.UDPConn)
 	d.cfg.CtlPort = d.ctlLn.Addr().(*net.TCPAddr).Port
 	d.cfg.DataPort = d.data.LocalAddr().(*net.UDPAddr).Port
 	name, _ := os.Hostname()
@@ -405,7 +413,7 @@ func (d *Daemon) Run(parent context.Context) error {
 		go ipc.Serve(ctx, ln, d.handleRPC, d.log)
 	}
 	if d.cfg.DNS {
-		go d.runDNS(ctx)
+		d.startDNS(ctx)
 	}
 	if d.cfg.Inhibitor != nil {
 		defer func() { _ = d.cfg.Inhibitor.Set(false) }()

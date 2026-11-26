@@ -22,10 +22,12 @@ func settingsCmd(ctx context.Context, sock string, args []string) error {
 	overflow := fs.Uint("overflow-mbps", 0, "secondary relays unused below this normal-relay rate (0 = off)")
 	pep := fs.String("pep", "", "off or on: split new TCP connections (PEP)")
 	pepEx := fs.String("pep-exclude", "", `comma-separated ports, ranges and IPv4 networks kept out of PEP ("" = none, e.g. 22,5000-5100,10.0.0.0/8)`)
+	own := fs.String("own-traffic", "", "on or off: this laptop's own traffic through CrossStream (Linux; always on on Windows)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 	var p hub.SettingsParams
+	var perr error
 	fs.Visit(func(f *flag.Flag) {
 		switch f.Name {
 		case "redundancy":
@@ -47,8 +49,17 @@ func settingsCmd(ctx context.Context, sock string, args []string) error {
 				}
 			}
 			p.PEPExclude = &list
+		case "own-traffic":
+			on := *own == "on"
+			if !on && *own != "off" {
+				perr = fmt.Errorf("-own-traffic %q: want on or off", *own)
+			}
+			p.OwnTraffic = &on
 		}
 	})
+	if perr != nil {
+		return perr
+	}
 	var res hub.Settings
 	method, params := hub.MethodSettingsGet, any(nil)
 	if fs.NFlag() > 0 {

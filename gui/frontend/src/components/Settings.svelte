@@ -9,6 +9,8 @@
   import CloseCard from './CloseCard.svelte'
   import DiagCard from './DiagCard.svelte'
   import UpdateCard from './UpdateCard.svelte'
+  import LangCard from './LangCard.svelte'
+  import { t } from '../i18n/i18n.svelte.js'
 
   let { view, notify } = $props()
   let hs = $state(null)
@@ -34,15 +36,15 @@
   })
   onMount(load)
 
-  // channelWhy turns xs-hubd's channel_why (English) into Polish.
+  // channelWhy turns xs-hubd's channel_why (English) into the UI language.
   function channelWhy(why) {
     if (!why) return ''
-    if (why === 'configured') return 'ustawiony ręcznie'
-    if (why.startsWith('auto:')) return 'wybrany automatycznie: najmniej zajęty'
-    if (why.startsWith('first usable')) return 'pierwszy dozwolony, bez skanowania'
-    if (why === 'chosen by Windows') return 'wybiera Windows'
-    if (why.startsWith('next to Wi-Fi')) return 'obok sieci Wi-Fi laptopa, na jej kanale'
-    return 'wybiera NetworkManager'
+    if (why === 'configured') return t('hotspot.why.configured')
+    if (why.startsWith('auto:')) return t('hotspot.why.auto')
+    if (why.startsWith('first usable')) return t('hotspot.why.first')
+    if (why === 'chosen by Windows') return t('hotspot.why.windows')
+    if (why.startsWith('next to Wi-Fi')) return t('hotspot.why.nextTo')
+    return t('hotspot.why.nm')
   }
 
   async function run(fn) {
@@ -61,14 +63,14 @@
       const changedLogin = form.ssid !== hs.settings.ssid || form.psk !== hs.settings.psk
       hs = await api.setHotspot({ ...form, channel: Number(form.channel) || 0 })
       form = { ...hs.settings }
-      notify(changedLogin ? 'Zapisano. Telefony trzeba sparować ponownie (nowy kod QR).' : 'Zapisano ustawienia hotspotu')
+      notify(changedLogin ? t('hotspot.savedRepair') : t('hotspot.saved'))
     })
 
   const power = (on) =>
     run(async () => {
       confirmStop = false
       hs = await api.hotspotPower(on)
-      notify(on ? 'Hotspot uruchomiony' : 'Hotspot zatrzymany')
+      notify(on ? t('hotspot.started') : t('hotspot.stopped'))
     })
 
   const enroll = () =>
@@ -81,132 +83,150 @@
       }
       code = ''
       if (enrolled.pending) {
-        notify('Nowy serwer jeszcze nie odpowiedział — hub przełączył się na niego i ponawia próby')
+        notify(t('enroll.pendingToast'))
         return
       }
-      notify(again ? 'Hub zarejestrowany ponownie — usługa uruchamia się od nowa' : 'Hub zarejestrowany na serwerze')
+      notify(again ? t('enroll.againToast') : t('enroll.doneToast'))
     })
 </script>
 
 <div class="grid">
   <div class="card">
-    <h2>Hotspot Wi-Fi</h2>
+    <h2>{t('hotspot.title')}</h2>
     {#if !hs}
-      <p class="muted">Ładowanie…</p>
+      <p class="muted">{t('common.loading')}</p>
     {:else if !hs.enabled}
-      <p class="muted">xs-hubd działa bez hotspotu (tryb headless).</p>
+      <p class="muted">{t('hotspot.headless')}</p>
     {:else}
       <p>
-        Stan:
+        {t('hotspot.state')}
         {#if hs.on}
-          <b class="ok">działa</b> · {hs.state.band === 'a' ? '5 GHz' : hs.state.band === 'bg' ? '2,4 GHz' : 'pasmo automatyczne'}{#if !windows}, kanał {hs.state.channel}{/if}
+          <b class="ok">{t('hotspot.running')}</b> · {hs.state.band === 'a' ? '5 GHz' : hs.state.band === 'bg' ? t('hotspot.band24') : t('hotspot.bandAuto')}{#if !windows}, {t('hotspot.channel', { n: hs.state.channel })}{/if}
           {#if channelWhy(hs.state.channel_why)}({channelWhy(hs.state.channel_why)}){/if}
-          · klienci: {hs.clients}
+          · {t('hotspot.clients', { n: hs.clients })}
         {:else}
-          <b class="bad">zatrzymany</b>
+          <b class="bad">{t('hotspot.stoppedState')}</b>
         {/if}
       </p>
-      {#if hs.on && hs.state.scan}<p class="muted small">Sąsiednie sieci (kanał: liczba, najsilniejsza): {hs.state.scan}</p>{/if}
+      {#if hs.on && hs.state.scan}<p class="muted small">{t('hotspot.scan', { scan: hs.state.scan })}</p>{/if}
       {#if hs.error}<p class="banner bad">{hs.error}</p>{/if}
       {#each hs.state.warnings ?? [] as w}<p class="banner warn">{w}</p>{/each}
       <form onsubmit={(e) => (e.preventDefault(), saveHotspot())}>
-        <label>Nazwa sieci (SSID) <input bind:value={form.ssid} maxlength="32" required /></label>
+        <label>{t('hotspot.ssid')} <input bind:value={form.ssid} maxlength="32" required /></label>
         <label>
-          Hasło
+          {t('hotspot.password')}
           <span class="pw">
             <input type={showPsk ? 'text' : 'password'} bind:value={form.psk} minlength="8" maxlength="63" required />
-            <button type="button" onclick={() => (showPsk = !showPsk)}>{showPsk ? 'Ukryj' : 'Pokaż'}</button>
+            <button type="button" onclick={() => (showPsk = !showPsk)}>{showPsk ? t('common.hide') : t('common.show')}</button>
           </span>
         </label>
         <label>
-          Pasmo
+          {t('hotspot.band')}
           <select bind:value={form.band}>
-            <option value="a">5 GHz (gdy niedostępne: 2,4 GHz)</option>
-            <option value="bg">2,4 GHz</option>
+            <option value="a">{t('hotspot.band5')}</option>
+            <option value="bg">{t('hotspot.band24')}</option>
           </select>
         </label>
         {#if !windows}
-          <label>Kanał (0 = automatycznie) <input type="number" min="0" max="196" bind:value={form.channel} /></label>
-          <label>Kraj (kod regulacyjny) <input bind:value={form.country} maxlength="2" /></label>
+          <label>{t('hotspot.channelInput')} <input type="number" min="0" max="196" bind:value={form.channel} /></label>
+          <label>{t('hotspot.country')} <input bind:value={form.country} maxlength="2" /></label>
           <label>
-            Gdy karta Wi-Fi jest połączona z siecią
+            {t('hotspot.clientWifi')}
             <select bind:value={form.client_wifi}>
-              <option value="">zapytaj przy starcie</option>
-              <option value="share">hotspot obok tej sieci (na jej kanale)</option>
-              <option value="disconnect">rozłącz Wi-Fi laptopa</option>
+              <option value="">{t('hotspot.clientWifi.ask')}</option>
+              <option value="share">{t('hotspot.clientWifi.share')}</option>
+              <option value="disconnect">{t('hotspot.clientWifi.disconnect')}</option>
             </select>
           </label>
         {/if}
-        <p class="muted small">Zmiana nazwy lub hasła restartuje hotspot — telefony trzeba sparować ponownie.</p>
+        <p class="muted small">{t('hotspot.restartHint')}</p>
         <div class="row">
-          <button class="primary" disabled={busy}>Zapisz i uruchom ponownie</button>
+          <button class="primary" disabled={busy}>{t('hotspot.saveRestart')}</button>
           {#if hs.on}
             <button type="button" class="danger" disabled={busy} onclick={() => (confirmStop = true)}>
-              Zatrzymaj hotspot
+              {t('hotspot.stop')}
             </button>
           {:else}
-            <button type="button" disabled={busy} onclick={() => power(true)}>Uruchom hotspot</button>
+            <button type="button" disabled={busy} onclick={() => power(true)}>{t('hotspot.start')}</button>
           {/if}
         </div>
       </form>
     {/if}
   </div>
   {#if confirmStop}
-    <ConfirmDialog title="Zatrzymać hotspot?" yes="Tak, zatrzymaj" no="Nie" danger
+    <ConfirmDialog title={t('hotspot.stopAsk')} yes={t('hotspot.stopYes')} no={t('common.no')} danger
       onyes={() => power(false)} onno={() => (confirmStop = false)}>
       <ul>
-        <li>Sieć „{hs.settings.ssid}” zniknie: wszystkie telefony ({view.relays.filter((r) => r.connected).length})
-          i urządzenia ({hs.clients}) zostaną rozłączone.</li>
-        <li>Hub nie będzie przesyłał danych, dopóki nie uruchomisz hotspotu ponownie.</li>
-        <li>Po ponownym uruchomieniu telefony połączą się same (bez parowania). Po restarcie usługi
-          xs-hubd hotspot startuje automatycznie.</li>
+        <li>{t('hotspot.stopWhat1', { ssid: hs.settings.ssid, phones: view.relays.filter((r) => r.connected).length, devices: hs.clients })}</li>
+        <li>{t('hotspot.stopWhat2')}</li>
+        <li>{t('hotspot.stopWhat3')}</li>
       </ul>
     </ConfirmDialog>
   {/if}
 
   <div class="card">
-    <h2>Serwer</h2>
+    <h2>{t('server.title')}</h2>
     {#if view.enrolled}
       <p>
-        {view.enroll_pending ? 'Rejestracja w toku (nowy serwer jeszcze nie odpowiedział)' : 'Zarejestrowany'}{#if view.server_ep}: <code>{view.server_ep}</code>{/if}
+        {view.enroll_pending ? t('server.pending') : t('server.enrolled')}{#if view.server_ep}: <code>{view.server_ep}</code>{/if}
       </p>
-      <p class="muted small">Tunel: {view.tunnel_up ? 'działa' : 'nie działa'}{view.tunnel_error ? ` (${view.tunnel_error})` : ''}</p>
+      <p class="muted small">{t('server.tunnel', { state: view.tunnel_up ? t('server.tunnelUp') : t('server.tunnelDown') })}{view.tunnel_error ? ` (${view.tunnel_error})` : ''}</p>
     {:else}
-      <p>Hub nie jest jeszcze zarejestrowany.</p>
+      <p>{t('server.notYet')}</p>
     {/if}
     <form onsubmit={(e) => (e.preventDefault(), enroll())}>
       <label>
-        Kod rejestracji (XS1…) od administratora serwera
+        {t('server.codeLabel')}
         <textarea bind:value={code} rows="3" placeholder="XS1.…" spellcheck="false"></textarea>
       </label>
       <p class="muted small">{pathHint(view)}</p>
       {#if view.enrolled}
-        <p class="muted small">Ponowna rejestracja zastępuje obecny serwer; usługa xs-hubd uruchomi się od nowa,
-          a telefony połączą się same.</p>
+        <p class="muted small">{t('server.againHint')}</p>
       {/if}
       <button class="primary" disabled={busy || !code.trim().startsWith('XS1.')}>
-        {busy ? 'Rejestruję…' : view.enrolled ? 'Zarejestruj ponownie' : 'Zarejestruj'}
+        {busy ? t('enroll.busy') : view.enrolled ? t('enroll.again') : t('enroll.button')}
       </button>
     </form>
     {#if enrolled?.pending}
       <div class="banner result">
-        Przełączono na nowy serwer jako <b>{enrolled.name}</b>; czekam na jego odpowiedź (hub ponawia próby).
-        <br />Serwer: {enrolled.endpoints?.join(', ')}
+        {t('enroll.switchedAs')} <b>{enrolled.name}</b>{t('enroll.switchedRest')}
+        <br />{t('enroll.serverList', { list: enrolled.endpoints?.join(', ') })}
       </div>
     {:else if enrolled}
       <div class="banner result">
-        Zarejestrowano jako <b>{enrolled.name}</b>, adres w tunelu <code>{enrolled.tunnel_ip}</code>, MTU {enrolled.mtu}.
-        <br />Serwer: {enrolled.endpoints?.join(', ')}
+        {t('enroll.doneAs')} <b>{enrolled.name}</b>{t('enroll.doneAddr')} <code>{enrolled.tunnel_ip}</code>, MTU {enrolled.mtu}.
+        <br />{t('enroll.serverList', { list: enrolled.endpoints?.join(', ') })}
       </div>
     {/if}
   </div>
 
+  {#if view.own_traffic !== undefined}
+    <div class="card">
+      <h2>{t('own.title')}</h2>
+      <div class="seg">
+        <button class:active={!view.own_traffic} disabled={busy || windows}
+          onclick={() => run(async () => (await api.setOwnTraffic(false), notify(t('own.offToast'))))}>{t('common.off')}</button>
+        <button class:active={view.own_traffic} disabled={busy || windows}
+          onclick={() => run(async () => (await api.setOwnTraffic(true), notify(t('own.onToast'))))}>{t('common.on')}</button>
+      </div>
+      {#if windows}
+        <p class="muted small">{t('own.windows')}</p>
+      {:else}
+        <p class="muted small">{t('own.hint')}</p>
+        {#if view.own_traffic && view.own_traffic_dns === 'system'}
+          <p class="muted small warn">{t('own.noResolved')}</p>
+        {/if}
+      {/if}
+    </div>
+  {/if}
+
   <BypassCard {notify} />
   {#if windows}
-    <section class="card"><h2>Przekierowanie portów</h2><p class="muted">Niedostępne w hubie na Windows (Mobile Hotspot nie pozwala dodać przekierowań).</p></section>
+    <section class="card"><h2>{t('fwd.title')}</h2><p class="muted">{t('fwd.windows')}</p></section>
   {:else}
     <ForwardsCard {notify} />
   {/if}
+  <LangCard {notify} />
   <NotifyCard {notify} />
   <CloseCard {notify} />
   <UpdateCard {notify} />
@@ -214,6 +234,27 @@
 </div>
 
 <style>
+  .seg {
+    display: inline-flex;
+    gap: 0;
+  }
+  .seg button {
+    border-radius: 0;
+  }
+  .seg button:first-child {
+    border-radius: 6px 0 0 6px;
+  }
+  .seg button:last-child {
+    border-radius: 0 6px 6px 0;
+  }
+  .seg button.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+  p.warn {
+    color: var(--warn, #c77700);
+  }
   .grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));

@@ -88,6 +88,7 @@ func (h *Hotspot) resolveClient(ctx context.Context, c HotspotConfig, cw *Client
 			return c, false, cw
 		}
 		st.Warnings = append(st.Warnings, fmt.Sprintf("Wi-Fi %q disconnected from %s for the hotspot", cw.Conn, c.Iface))
+		h.restore = cw.Conn // connected again when the hotspot goes down
 		if err := h.dropVif(ctx); err != nil {
 			st.Warnings = append(st.Warnings, err.Error())
 		}

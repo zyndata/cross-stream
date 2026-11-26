@@ -19,7 +19,7 @@ func testUpdater(t *testing.T, version, tag string) *updater {
 			`","size":1234,"browser_download_url":"https://github.com/zyndata/cross-stream/releases/download/` + tag + `/` + name + `"}]}`))
 	}))
 	t.Cleanup(srv.Close)
-	u := newUpdater(version)
+	u := newUpdater(version, testTexts(langPL))
 	u.client = &update.Client{HTTP: srv.Client(), LatestURL: srv.URL, Prefix: update.AssetPrefix}
 	u.path = filepath.Join(t.TempDir(), updateFile)
 	u.prefs = updatePrefs{}

@@ -256,10 +256,10 @@ func (s *Server) staticFiles() http.Handler {
 }
 
 const placeholder = `<!doctype html>
-<html lang="pl"><head><meta charset="utf-8"><title>CrossStream</title></head>
-<body><h1>CrossStream</h1><p>Panel WWW nie został zbudowany w tym pliku binarnym
-(obraz Docker buduje go w etapie node; lokalnie: <code>make webui</code>, potem go build).
-API działa pod /api/.</p></body></html>
+<html lang="en"><head><meta charset="utf-8"><title>CrossStream</title></head>
+<body><h1>CrossStream</h1><p>The web panel is not built into this binary
+(the Docker image builds it in its node stage; locally: <code>make webui</code>, then go build).
+The API works under /api/.</p></body></html>
 `
 
 func decode(w http.ResponseWriter, r *http.Request, v any) bool {

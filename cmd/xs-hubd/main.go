@@ -78,7 +78,7 @@ func run(ctx context.Context, args []string, logOut io.Writer) error {
 		level = slog.LevelDebug
 	}
 	logs := hublog.NewRing(hublog.DefaultLines) // GUI "Eksportuj logi" / xs-hubctl logs
-	logLevel := hublog.NewLevel(level)          // xs-hubctl loglevel / GUI "Szczegółowe logi"
+	logLevel := hublog.NewLevel(level)          // xs-hubctl loglevel / GUI "Detailed logs"
 	defer logLevel.Stop()
 	log := slog.New(slog.NewTextHandler(io.MultiWriter(logOut, logs), &slog.HandlerOptions{Level: logLevel.Var()}))
 	if err := netcfg.SecureDir(*dir); err != nil {

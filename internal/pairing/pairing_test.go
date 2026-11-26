@@ -228,12 +228,25 @@ func TestRegistry(t *testing.T) {
 	if len(list) != 2 || list[0].ID != "r3" || list[1].Name != "bobby" || list[1].Carrier != "Orange" || !r2.IsForgotten(ka) {
 		t.Fatalf("reopened %+v", list)
 	}
-	// Re-pairing a forgotten key (fresh token) clears the forgotten mark.
+	// Re-pairing a forgotten key (fresh token) clears the forgotten mark and
+	// gives the relay its old id back (one usage history entry per phone).
 	if _, err := r2.Forget("r2"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := r2.Add(ka, control.Hello{RelayName: "anna"}); err != nil || r2.IsForgotten(ka) {
-		t.Fatalf("re-pair: %v forgotten=%v", err, r2.IsForgotten(ka))
+	back, err := r2.Add(ka, control.Hello{RelayName: "anna"})
+	if err != nil || r2.IsForgotten(ka) || back.ID != "r1" {
+		t.Fatalf("re-pair: %+v %v forgotten=%v", back, err, r2.IsForgotten(ka))
+	}
+	// Persisted: bob (r2) comes back as r2 after a reopen; a new key still gets a new id.
+	r3, err := OpenRegistry(dir, c.now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bb, err := r3.Add(kb, control.Hello{RelayName: "bob"}); err != nil || bb.ID != "r2" {
+		t.Fatalf("bob back: %+v %v", bb, err)
+	}
+	if kd, err := r3.Add(key(t), control.Hello{RelayName: "dora"}); err != nil || kd.ID != "r4" {
+		t.Fatalf("new key: %+v %v", kd, err)
 	}
 	if runtime.GOOS != "windows" {
 		st, _ := os.Stat(filepath.Join(dir, RegistryFile))

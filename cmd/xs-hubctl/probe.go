@@ -15,7 +15,8 @@ import (
 func probeCmd(ctx context.Context, dir string, args []string, log *slog.Logger) error {
 	fs := flag.NewFlagSet("probe", flag.ContinueOnError)
 	to := fs.String("to", "", "server host:port list to send to instead of the enrolled endpoints")
-	via := fs.String("via", "", "local interface to send from (default: routing table)")
+	via := fs.String("via", "", "send from this interface's IPv4 address (the route still follows the "+
+		"routing table; default: routing table)")
 	code := fs.String("code", "", "XS1 code to enroll -dir with when it has no enrollment yet")
 	if err := fs.Parse(args); err != nil {
 		return err

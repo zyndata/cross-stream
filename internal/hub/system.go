@@ -144,8 +144,14 @@ func (d *Daemon) setupNet(ctx context.Context) error {
 	d.mu.Unlock()
 	lan.NoPath = !mode.carries()
 	lan.Forward = d.cfg.HotspotNAT.IsValid()
+	lan.OwnTraffic = d.settings.Load().OwnTraffic
+	// Windows: WFP leak filters (nil elsewhere).
+	lan.Leaks = netcfg.NewLeakGuard()
 	if e != nil { // resolved outside mu: the lookup can block for seconds
-		lan.MTU, lan.Blocked = e.MTU, serverIPs(ctx, e.Endpoints)
+		lan.MTU, lan.Blocked, lan.TunAddr = e.MTU, serverIPs(ctx, e.Endpoints), tunnelAddr(*e)
+	}
+	if lan.OwnTraffic && !netcfg.OwnTrafficAlways {
+		d.checkOwnDNS()
 	}
 	d.mu.Lock()
 	d.netLAN = lan
@@ -158,8 +164,12 @@ func (d *Daemon) setupNet(ctx context.Context) error {
 	return nil
 }
 
-// ensureNet repairs missing routes, rules or nft rules (watchdog).
+// ensureNet repairs missing routes, rules or nft rules (watchdog). ensMu: two
+// callers at once both saw a rule missing and the second "ip rule add" failed
+// with "File exists" (field test 2026-11-25, re-enrollment).
 func (d *Daemon) ensureNet(ctx context.Context) {
+	d.ensMu.Lock()
+	defer d.ensMu.Unlock()
 	d.mu.Lock()
 	lan, e := d.netLAN, d.enr
 	d.mu.Unlock()
@@ -223,9 +233,11 @@ func (d *Daemon) netTunnel(e Enrollment) {
 		return
 	}
 	ips := serverIPs(d.ctx, e.Endpoints) // outside mu: the lookup can block for seconds
-	if err := d.applyLAN(d.ctx, func(l *netcfg.LAN) bool { l.MTU, l.Blocked = e.MTU, ips; return true }); err != nil {
+	ip := tunnelAddr(e)
+	if err := d.applyLAN(d.ctx, func(l *netcfg.LAN) bool { l.MTU, l.Blocked, l.TunAddr = e.MTU, ips, ip; return true }); err != nil {
 		d.log.Warn("nft rules", "err", err)
 	}
+	d.serveTunnelDNS(ip)
 	d.ensureNet(d.ctx)
 }
 
@@ -293,14 +305,29 @@ func containsAddr(ips []netip.Addr, ip netip.Addr) bool {
 	return false
 }
 
-// runDNS serves DNS on every port address, forwarded through the tunnel.
-func (d *Daemon) runDNS(ctx context.Context) {
+// startDNS serves DNS on every port address (and, once enrolled, on the
+// tunnel address for the laptop's own lookups), forwarded through the tunnel.
+func (d *Daemon) startDNS(ctx context.Context) {
 	var listen []netip.AddrPort
 	for _, p := range d.ports() {
 		listen = append(listen, netip.AddrPortFrom(p.Addr.Addr(), 53))
 	}
-	dns.New(dns.Config{Listen: listen, Upstreams: d.cfg.DNSUpstreams, Dial: netcfg.DialVia(d.cfg.TunName), Log: d.log,
-		OnAnswer: d.learnBypass, Canary: d.bp.Active}).Run(ctx)
+	srv := dns.New(dns.Config{Listen: listen, Upstreams: d.cfg.DNSUpstreams, Dial: netcfg.DialVia(d.cfg.TunName), Log: d.log,
+		OnAnswer: d.learnBypass, Canary: d.bp.Active, Control: netcfg.Control(nil)})
+	d.mu.Lock()
+	d.dnsSrv = srv
+	e := d.enr
+	d.mu.Unlock()
+	go srv.Run(ctx)
+	if e != nil {
+		d.serveTunnelDNS(tunnelAddr(*e))
+	}
+}
+
+// tunnelAddr is the enrollment's tunnel address (invalid while pending).
+func tunnelAddr(e Enrollment) netip.Addr {
+	ip, _ := netip.ParseAddr(e.TunnelIP)
+	return ip
 }
 
 // systemLoop updates the mode every second and, every PowerCheckEvery, the

@@ -15,6 +15,7 @@ import (
 	"github.com/zyndata/cross-stream/internal/bond"
 	"github.com/zyndata/cross-stream/internal/crypto"
 	"github.com/zyndata/cross-stream/internal/enroll"
+	"github.com/zyndata/cross-stream/internal/hub/netcfg"
 	"github.com/zyndata/cross-stream/internal/pep"
 	"github.com/zyndata/cross-stream/internal/session"
 	"github.com/zyndata/cross-stream/internal/tun"
@@ -505,9 +506,9 @@ func ListenUDP(via string) (*net.UDPConn, error) {
 			return nil, fmt.Errorf("interface %s has no IPv4 address", via)
 		}
 	}
-	c, err := net.ListenUDP("udp4", local)
+	pc, err := netcfg.ListenConfig().ListenPacket(context.Background(), "udp4", local.String())
 	if err != nil {
 		return nil, fmt.Errorf("listen udp: %w", err)
 	}
-	return c, nil
+	return pc.(*net.UDPConn), nil
 }

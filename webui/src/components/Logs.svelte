@@ -1,5 +1,6 @@
 <script>
   import { api } from '../lib/api.js'
+  import { t } from '../i18n/i18n.svelte.js'
 
   let lines = $state([])
   let error = $state('')
@@ -10,10 +11,10 @@
 </script>
 
 <div class="card">
-  <h2>Logi serwera <span class="muted small">(ostatnie 200 linii, zanonimizowane)</span>
-    <button class="refresh" onclick={load}>Odśwież</button></h2>
+  <h2>{t('logs.title')} <span class="muted small">{t('logs.note')}</span>
+    <button class="refresh" onclick={load}>{t('common.refresh')}</button></h2>
   {#if error}<div class="banner bad">{error}</div>{/if}
-  <pre>{lines.join('\n') || 'Brak linii.'}</pre>
+  <pre>{lines.join('\n') || t('logs.none')}</pre>
 </div>
 
 <style>

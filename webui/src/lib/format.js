@@ -1,7 +1,9 @@
-// Display helpers (Polish UI).
+// Display helpers; text and number format follow the active language.
+import { t, num, loc } from '../i18n/i18n.svelte.js'
+
 export function mbps(bytesPerSec) {
   const v = ((bytesPerSec || 0) * 8) / 1e6
-  return v < 10 ? v.toFixed(2) + ' Mb/s' : v.toFixed(1) + ' Mb/s'
+  return num(v, v < 10 ? 2 : 1) + ' Mb/s'
 }
 
 export function bytes(n) {
@@ -12,37 +14,37 @@ export function bytes(n) {
     n /= 1024
     i++
   }
-  return (i === 0 ? n.toFixed(0) : n.toFixed(1)) + ' ' + units[i]
+  return num(n, i === 0 ? 0 : 1) + ' ' + units[i]
 }
 
 // ms formats a Go time.Duration (nanoseconds in JSON).
 export function ms(ns) {
-  return Math.round((ns || 0) / 1e6) + ' ms'
+  return num(Math.round((ns || 0) / 1e6)) + ' ms'
 }
 
 export function pct(f) {
-  return ((f || 0) * 100).toFixed(1) + ' %'
+  return num((f || 0) * 100, 1) + ' %'
 }
 
-export function when(t) {
-  if (!t || t.startsWith('0001-')) return '—'
-  return new Date(t).toLocaleString('pl-PL')
+export function when(time) {
+  if (!time || time.startsWith('0001-')) return '—'
+  return new Date(time).toLocaleString(loc())
 }
 
-export function ago(t, now = Date.now()) {
-  if (!t || t.startsWith('0001-')) return 'nigdy'
-  const s = Math.max(0, Math.round((now - new Date(t).getTime()) / 1000))
-  if (s < 60) return s + ' s temu'
-  if (s < 3600) return Math.round(s / 60) + ' min temu'
-  return Math.round(s / 3600) + ' h temu'
+export function ago(time, now = Date.now()) {
+  if (!time || time.startsWith('0001-')) return t('ago.never')
+  const s = Math.max(0, Math.round((now - new Date(time).getTime()) / 1000))
+  if (s < 60) return t('ago.s', { n: s })
+  if (s < 3600) return t('ago.min', { n: Math.round(s / 60) })
+  return t('ago.h', { n: Math.round(s / 3600) })
 }
 
-const states = { alive: 'działa', suspect: 'niepewna', sleeping: 'uśpiona', dead: 'nie działa' }
+const states = ['alive', 'suspect', 'sleeping', 'dead']
 export function pathState(s) {
-  return states[s] || s || '—'
+  return states.includes(s) ? t('path.' + s) : s || '—'
 }
 
-const prios = { normal: 'normalny', secondary: 'dodatkowy', backup: 'zapasowy' }
+const prios = ['normal', 'secondary', 'backup']
 export function priority(p) {
-  return prios[p] || p || '—'
+  return prios.includes(p) ? t('prio.' + p) : p || '—'
 }

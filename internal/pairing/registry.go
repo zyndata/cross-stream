@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -45,6 +46,9 @@ type registryData struct {
 	NextID    int      `json:"next_id"`
 	Relays    []Relay  `json:"relays"`
 	Forgotten []string `json:"forgotten,omitempty"` // keys of forgotten relays
+	// ForgottenIDs maps a forgotten key to the id it had, so the same phone
+	// pairing again keeps its id (and its usage history). Older files lack it.
+	ForgottenIDs map[string]string `json:"forgotten_ids,omitempty"`
 }
 
 // Registry is the persistent list of paired relays plus the keys of
@@ -101,8 +105,9 @@ func (r *Registry) IsForgotten(key [crypto.KeyLen]byte) bool {
 }
 
 // Add registers a newly paired relay (the caller has checked its pairing
-// token). It gets a new id and the lowest free path id; a forgotten key is
-// taken off the forgotten list. Adding a known key returns the existing relay.
+// token). It gets the lowest free path id and a new id, or the id it had if
+// this key was forgotten (the usage history stays one entry); a forgotten key
+// is taken off the forgotten list. Adding a known key returns the existing relay.
 func (r *Registry) Add(key [crypto.KeyLen]byte, h control.Hello) (Relay, error) {
 	k := crypto.EncodeKey(key)
 	r.mu.Lock()
@@ -116,12 +121,20 @@ func (r *Registry) Add(key [crypto.KeyLen]byte, h control.Hello) (Relay, error) 
 	if !ok {
 		return Relay{}, ErrFull
 	}
-	rl := Relay{ID: "r" + strconv.Itoa(r.d.NextID), Key: k, Name: h.RelayName, Carrier: h.Carrier,
-		PathID: pid, Limits: h.Limits, PairedAt: r.now().UTC()}
 	d := r.d
-	d.NextID++
+	id, ok := d.ForgottenIDs[k]
+	if !ok || r.indexLocked(id) >= 0 {
+		id = "r" + strconv.Itoa(d.NextID)
+		d.NextID++
+	}
+	rl := Relay{ID: id, Key: k, Name: h.RelayName, Carrier: h.Carrier,
+		PathID: pid, Limits: h.Limits, PairedAt: r.now().UTC()}
 	d.Relays = append(slices.Clone(d.Relays), rl)
 	d.Forgotten = slices.DeleteFunc(slices.Clone(d.Forgotten), func(s string) bool { return s == k })
+	if _, ok := d.ForgottenIDs[k]; ok {
+		d.ForgottenIDs = maps.Clone(d.ForgottenIDs)
+		delete(d.ForgottenIDs, k)
+	}
 	if err := r.saveLocked(d); err != nil {
 		return Relay{}, err
 	}
@@ -168,7 +181,14 @@ func (r *Registry) Forget(idOrName string) (Relay, error) {
 	rl := r.d.Relays[i]
 	d := r.d
 	d.Relays = slices.Delete(slices.Clone(d.Relays), i, i+1)
-	d.Forgotten = append(slices.Clone(d.Forgotten), rl.Key)
+	if !slices.Contains(d.Forgotten, rl.Key) {
+		d.Forgotten = append(slices.Clone(d.Forgotten), rl.Key)
+	}
+	d.ForgottenIDs = maps.Clone(d.ForgottenIDs)
+	if d.ForgottenIDs == nil {
+		d.ForgottenIDs = map[string]string{}
+	}
+	d.ForgottenIDs[rl.Key] = rl.ID
 	if err := r.saveLocked(d); err != nil {
 		return Relay{}, err
 	}

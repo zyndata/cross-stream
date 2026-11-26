@@ -11,6 +11,7 @@ import (
 
 	"github.com/zyndata/cross-stream/internal/control"
 	"github.com/zyndata/cross-stream/internal/direct"
+	"github.com/zyndata/cross-stream/internal/hub/netcfg"
 	"github.com/zyndata/cross-stream/internal/tun"
 	"github.com/zyndata/cross-stream/internal/wire"
 )
@@ -47,6 +48,7 @@ func (d *Daemon) newDirect(dev tun.Device) (*direct.Stack, error) {
 			}
 		},
 		Intercept: d.pepIntercept,
+		Dial:      netcfg.Dialer().DialContext, // relay proxies: marked (own traffic)
 		Log:       d.log,
 	})
 }

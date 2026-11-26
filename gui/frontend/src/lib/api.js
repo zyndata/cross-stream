@@ -2,11 +2,13 @@
 // generated wailsjs/ folder is not needed. Outside Wails (vite dev in a
 // browser) every call rejects and the view stays in the "daemon" state.
 
+import { t } from '../i18n/i18n.svelte.js'
+
 const app = () => window.go?.main?.App
 
 function call(name, ...args) {
   const a = app()
-  if (!a) return Promise.reject(new Error('daemon: brak backendu Wails'))
+  if (!a) return Promise.reject(new Error('daemon: ' + t('err.noBackend')))
   return a[name](...args)
 }
 
@@ -25,6 +27,7 @@ export const api = {
   setBond: (mode, redundancy) => call('SetBond', mode, redundancy),
   pepSettings: () => call('PEPSettings'),
   setPEP: (on, exclude) => call('SetPEP', on, exclude),
+  setOwnTraffic: (on) => call('SetOwnTraffic', on),
   speedTest: (p) => call('SpeedTest', p),
   speedTests: () => call('SpeedTests'),
   bypass: () => call('Bypass'),
@@ -42,7 +45,7 @@ export function onView(fn) {
   return window.runtime?.EventsOn?.('view', fn) ?? (() => {})
 }
 
-// errorText turns a backend error ("state: message") into Polish text.
+// errorText turns a backend error ("state: message") into text in the active language.
 export function errorText(err) {
   const s = String(err?.message ?? err ?? '')
   const i = s.indexOf(': ')
@@ -50,9 +53,9 @@ export function errorText(err) {
   const msg = i > 0 ? s.slice(i + 2) : s
   switch (state) {
     case 'daemon':
-      return 'Usługa xs-hubd nie działa.'
+      return t('err.daemon')
     case 'group':
-      return 'Brak dostępu do xs-hubd (grupa crossstream).'
+      return t('err.group')
     case 'error':
       return msg
   }
@@ -85,22 +88,16 @@ export function onUpdate(fn) {
   return window.runtime?.EventsOn?.('update', fn) ?? (() => {})
 }
 
-// enrollErrorText turns an enrollment failure into a Polish hint (phase 19).
+// enrollErrorText turns an enrollment failure into a hint (phase 19); the
+// backend substrings are English in both languages.
 export function enrollErrorText(err) {
   const s = errorText(err)
-  if (s.includes('no answer from the server through')) {
-    return (
-      'Serwer nie odpowiada przez połączenie tego komputera ani łącze lokalne. Jeśli serwer stoi w tej samej ' +
-      'sieci domowej, router zwykle nie przepuszcza połączeń do własnego adresu publicznego (brak „hairpin NAT”): ' +
-      'dodaj telefon i zarejestruj hub przez niego albo włącz hairpin NAT na routerze. Sprawdź też, czy kod jest nowy.'
-    )
-  }
-  if (s.includes('no handshake response')) {
-    return (
-      'Serwer nie odpowiada. Spróbuj jeszcze raz tym samym kodem — jeśli serwer już przyjął ten hub, rejestracja ' +
-      'się dokończy. Kod mógł też wygasnąć (ważny 24 h) albo zostać cofnięty, albo serwer nie działa.'
-    )
-  }
-  if (s.includes('an enrollment is already running')) return 'Rejestracja już trwa.'
+  if (s.includes('no answer from the server through')) return t('enroll.err.noAnswer')
+  if (s.includes('no handshake response')) return t('enroll.err.noHandshake')
+  if (s.includes('an enrollment is already running')) return t('enroll.err.running')
   return s
 }
+
+// Language (gui/lang.go): {choice, lang}.
+api.language = () => call('Language')
+api.setLanguage = (choice) => call('SetLanguage', choice)

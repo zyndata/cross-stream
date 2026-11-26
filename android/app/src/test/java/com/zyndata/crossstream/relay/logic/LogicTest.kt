@@ -291,6 +291,51 @@ class HubsTest {
     }
 
     @Test
+    fun hubLabel() {
+        val h = hub("a", "02:00:00:00:00:01")
+        data class Case(val label: String, val clean: String, val shown: String)
+        for (cs in listOf(
+            Case("", "", "a"),
+            Case("  ", "", "a"),
+            Case(" Lenovo w domu ", "Lenovo w domu", "Lenovo w domu"),
+            Case("x".repeat(40), "x".repeat(SavedHub.LABEL_MAX), "x".repeat(SavedHub.LABEL_MAX)),
+        )) {
+            val l = SavedHub.cleanLabel(cs.label)
+            assertEquals(cs.label, cs.clean, l)
+            val withLabel = h.copy(label = l)
+            assertEquals(cs.label, cs.shown, withLabel.shownName)
+            assertEquals("json round trip", withLabel, SavedHub.fromJson(withLabel.toJson()))
+        }
+    }
+
+    @Test
+    fun sessionScanAndSwitchOffer() {
+        val a = hub("a", "02:00:00:00:00:01").copy(preferred = true)
+        val b = hub("b", "02:00:00:00:00:02")
+        val onlyB = listOf(SeenAp("02:00:00:00:00:02", "CS-b", -40))
+        val both = onlyB + SeenAp("02:00:00:00:00:01", "CS-a", -60)
+        // The session started with a scan without the chosen hub; a later scan has it.
+        assertFalse("start scan: chosen away", HubPicker.switchTo(listOf(a, b), "b", onlyB, emptyMap(), 100))
+        val later = HubPicker.sessionScan(onlyB, both)
+        assertEquals(both, later)
+        assertTrue("later scan: switch", HubPicker.switchTo(listOf(a, b), "b", later, emptyMap(), 100))
+        assertEquals("empty results keep the last scan", onlyB, HubPicker.sessionScan(onlyB, emptyList()))
+        assertEquals("no results keep the last scan", onlyB, HubPicker.sessionScan(onlyB, null))
+        assertEquals(null, HubPicker.sessionScan(null, null))
+
+        data class Case(val name: String, val hubs: List<SavedHub>, val current: String, val inSession: Boolean, val want: SavedHub?)
+        for (cs in listOf(
+            Case("sharing with another hub", listOf(a, b), "b", true, a),
+            Case("already on the chosen hub", listOf(a, b), "a", true, null),
+            Case("nothing chosen", listOf(b, a.copy(preferred = false)), "b", true, null),
+            Case("not in a session", listOf(a, b), "b", false, null),
+            Case("no current hub", listOf(a, b), "", true, null),
+        )) {
+            assertEquals(cs.name, cs.want, HubPicker.switchOffer(cs.hubs, cs.current, cs.inSession))
+        }
+    }
+
+    @Test
     fun backoff() {
         assertEquals(listOf(5_000L, 10_000L, 20_000L, 40_000L, 60_000L, 60_000L), (0..5).map(HubPicker::backoff))
     }

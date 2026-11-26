@@ -45,4 +45,13 @@ object RelayStateHolder {
     fun wakeSearch() {
         wake.tryEmit(Unit)
     }
+
+    private val switch = MutableSharedFlow<Unit>(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+
+    /** Asks the relay to leave its hub and join the chosen one now ("Switch now"). */
+    val switchRequests: SharedFlow<Unit> = switch
+
+    fun requestSwitch() {
+        switch.tryEmit(Unit)
+    }
 }

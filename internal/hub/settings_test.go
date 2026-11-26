@@ -3,12 +3,14 @@ package hub
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/netip"
 	"testing"
 
 	"github.com/zyndata/cross-stream/internal/control"
 	"github.com/zyndata/cross-stream/internal/crypto"
+	"github.com/zyndata/cross-stream/internal/hub/netcfg"
 )
 
 func newTestDaemon(t *testing.T, dir string, cfg DaemonConfig) *Daemon {
@@ -125,5 +127,46 @@ func TestRelayGoneInStatus(t *testing.T) {
 	d.relayGone(rec.ID, "leaving: limit")
 	if rs := d.Status().Relays[0]; rs.LastReason != "leaving: limit" || rs.LastSeen.IsZero() {
 		t.Fatalf("after leave: %+v", rs)
+	}
+}
+
+// TestOwnTrafficSetting: the switch round-trips through settings.set/get,
+// the saved file and status; Windows has no "off" (phase 21 W1).
+func TestOwnTrafficSetting(t *testing.T) {
+	dir := shortTemp(t)
+	d := newTestDaemon(t, dir, DaemonConfig{})
+	ctx := context.Background()
+	if got := d.Status().OwnTraffic; got != netcfg.OwnTrafficAlways {
+		t.Fatalf("default own_traffic %v", got)
+	}
+	tests := []struct {
+		params string
+		want   bool
+		err    bool
+	}{
+		{`{"own_traffic":true}`, true, false},
+		{`{"own_traffic":false}`, false, netcfg.OwnTrafficAlways},
+		{`{"mode":"min_latency"}`, netcfg.OwnTrafficAlways, false}, // other settings keep it
+	}
+	for _, tc := range tests {
+		res, err := d.handleRPC(ctx, MethodSettingsSet, json.RawMessage(tc.params))
+		if tc.err {
+			if !errors.Is(err, ErrOwnTrafficFixed) {
+				t.Fatalf("%s: err %v, want ErrOwnTrafficFixed", tc.params, err)
+			}
+			continue
+		}
+		if err != nil || res.(Settings).OwnTraffic != tc.want {
+			t.Fatalf("%s: %v %v", tc.params, res, err)
+		}
+		if got := d.Status().OwnTraffic; got != tc.want {
+			t.Fatalf("%s: status own_traffic %v", tc.params, got)
+		}
+	}
+	_, _ = d.handleRPC(ctx, MethodSettingsSet, json.RawMessage(`{"own_traffic":true}`))
+	_ = d.ctlLn.Close()
+	_ = d.data.Close()
+	if got := newTestDaemon(t, dir, DaemonConfig{}).Settings().OwnTraffic; !got {
+		t.Fatal("own_traffic not saved")
 	}
 }

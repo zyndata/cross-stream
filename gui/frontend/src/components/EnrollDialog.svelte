@@ -5,6 +5,7 @@
   // local link or this computer's own connection (phase 19, owner decision).
   import { api, enrollErrorText } from '../lib/api.js'
   import Pairing from './Pairing.svelte'
+  import { t } from '../i18n/i18n.svelte.js'
 
   let { view, notify, onclose } = $props()
   let phones = $derived((view.relays ?? []).filter((r) => r.connected))
@@ -31,7 +32,7 @@
     err = ''
     try {
       const e = await api.enroll(code.trim())
-      notify(`Hub zarejestrowany jako ${e.name}`)
+      notify(t('enroll.doneAsToast', { name: e.name }))
       onclose()
     } catch (e) {
       err = enrollErrorText(e)
@@ -45,47 +46,45 @@
 
 <div class="backdrop" role="presentation">
   <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="enr-title">
-    <h3 id="enr-title">Zarejestruj hub na serwerze <span class="muted">· krok {step} z 2</span></h3>
+    <h3 id="enr-title">{t('enroll.dialogTitle')} <span class="muted">· {t('enroll.step', { n: step, total: 2 })}</span></h3>
     {#if step === 1}
       <p class="small">
-        Najpierw dodaj telefon: w aplikacji CrossStream Relay „+ Dodaj hub” i zeskanuj kod. Rejestracja pójdzie
-        przez jego sieć komórkową — to działa także wtedy, gdy serwer stoi w tej samej sieci domowej.
+        {t('enroll.step1')}
       </p>
       <Pairing {notify} />
       {#if phones.length > 0}
-        <p class="ok small">Połączony: {phones.map((r) => r.name).join(', ')}</p>
+        <p class="ok small">{t('enroll.phoneConnected', { names: phones.map((r) => r.name).join(', ') })}</p>
       {:else}
-        <p class="muted small">Czekam na telefon…</p>
+        <p class="muted small">{t('enroll.waitPhone')}</p>
       {/if}
       <div class="buttons">
-        <button type="button" onclick={onclose}>Później</button>
+        <button type="button" onclick={onclose}>{t('enroll.later')}</button>
         {#if phones.length === 0}
-          <button type="button" onclick={() => (step = 2)}>Bez telefonu</button>
+          <button type="button" onclick={() => (step = 2)}>{t('enroll.noPhone')}</button>
         {/if}
-        <button type="button" class="primary" disabled={phones.length === 0} onclick={() => (step = 2)}>Dalej</button>
+        <button type="button" class="primary" disabled={phones.length === 0} onclick={() => (step = 2)}>{t('enroll.next')}</button>
       </div>
     {:else}
       <form onsubmit={(e) => (e.preventDefault(), enroll())}>
         <label>
-          Kod rejestracji (XS1…) od administratora serwera
+          {t('server.codeLabel')}
           <textarea bind:this={area} bind:value={code} rows="3" placeholder="XS1.…" spellcheck="false"></textarea>
         </label>
         <p class="muted small">
           {#if phones.length > 0}
-            Rejestracja pójdzie przez telefon ({phones.map((r) => r.name).join(', ')}).
+            {t('enroll.viaPhone', { names: phones.map((r) => r.name).join(', ') })}
           {:else if links > 0}
-            Brak telefonu: rejestracja pójdzie przez włączone łącze lokalne huba.
+            {t('enroll.viaLink')}
           {:else}
-            Brak telefonu: rejestracja pójdzie przez połączenie internetowe tego komputera. Jeśli serwer stoi
-            w tej samej sieci domowej, może się nie udać — wtedy wróć i dodaj telefon.
+            {t('enroll.viaComputer')}
           {/if}
         </p>
         {#if err}<p class="bad small">{err}</p>{/if}
         <div class="buttons">
-          <button type="button" onclick={() => ((step = 1), (err = ''))} disabled={busy}>Wstecz</button>
-          <button type="button" onclick={onclose} disabled={busy}>Później</button>
+          <button type="button" onclick={() => ((step = 1), (err = ''))} disabled={busy}>{t('enroll.back')}</button>
+          <button type="button" onclick={onclose} disabled={busy}>{t('enroll.later')}</button>
           <button class="primary" disabled={busy || !code.trim().startsWith('XS1.')}>
-            {busy ? 'Rejestruję…' : 'Zarejestruj'}
+            {busy ? t('enroll.busy') : t('enroll.button')}
           </button>
         </div>
       </form>

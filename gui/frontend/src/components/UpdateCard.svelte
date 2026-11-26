@@ -1,6 +1,7 @@
 <script>
   // Settings: version, check at start on/off, check now, install.
   import { api, errorText } from '../lib/api.js'
+  import { t } from '../i18n/i18n.svelte.js'
   import { upd } from '../lib/update.svelte.js'
 
   let { notify } = $props()
@@ -27,38 +28,36 @@
 
 {#if v}
   <div class="card">
-    <h2>Aktualizacje</h2>
+    <h2>{t('upd.title')}</h2>
     <p class="muted small">
-      Wersja <b>{v.version}</b>. Sprawdzenie to jedno zapytanie do GitHuba (kilka KB), bez żadnych danych o hubie.
-      Nowa wersja pobiera się dopiero po kliknięciu „Zainstaluj”.
+      {t('upd.version')} <b>{v.version}</b>. {t('upd.hint')}
     </p>
     {#if !v.release}
-      <p class="muted small">To wersja deweloperska: nie jest aktualizowana z wydań.</p>
+      <p class="muted small">{t('upd.dev')}</p>
     {/if}
     <label class="check">
       <input type="checkbox" checked={v.auto} onchange={(e) => setAuto(e.currentTarget.checked)} />
-      Sprawdzaj przy uruchomieniu aplikacji
+      {t('upd.auto')}
     </label>
     <div class="row">
-      <button onclick={check} disabled={busy}>{v.state === 'checking' ? 'Sprawdzam…' : 'Sprawdź teraz'}</button>
+      <button onclick={check} disabled={busy}>{v.state === 'checking' ? t('uplink.checking') : t('upd.checkNow')}</button>
       {#if v.available}
-        <span>Dostępna wersja <b>{v.available.tag}</b>.</span>
+        <span>{t('upd.available')} <b>{v.available.tag}</b>.</span>
         {#if v.state === 'downloading'}
-          <span class="muted">Pobieranie… {v.progress}%</span>
+          <span class="muted">{t('upd.downloadingShort')} {v.progress}%</span>
         {:else if v.state === 'installing'}
-          <span class="muted">Instalowanie…</span>
+          <span class="muted">{t('upd.installing')}</span>
         {:else}
-          {#if v.can_install}<button class="primary" onclick={() => (upd.confirm = true)}>Zainstaluj</button>{/if}
-          <button onclick={() => api.openURL(v.available.page)}>Co nowego</button>
+          {#if v.can_install}<button class="primary" onclick={() => (upd.confirm = true)}>{t('upd.install')}</button>{/if}
+          <button onclick={() => api.openURL(v.available.page)}>{t('upd.whatsNew')}</button>
         {/if}
       {:else if v.checked}
-        <span class="muted">Najnowsze wydanie: {v.latest}{v.release ? ' — masz aktualną wersję.' : '.'}</span>
+        <span class="muted">{t('upd.latest', { tag: v.latest })}{v.release ? t('upd.upToDate') : '.'}</span>
       {/if}
     </div>
     {#if v.available && !v.can_install && v.release}
       <p class="muted small">
-        Ten hub nie zainstaluje aktualizacji sam (uruchomiony spoza katalogu instalacji): pobierz ją ze strony
-        wydania albo użyj <code>sudo xs-hubctl update -install</code>.
+        {t('upd.cannotInstall')} <code>sudo xs-hubctl update -install</code>.
       </p>
     {/if}
     {#if v.error}<p class="err small">{v.error}</p>{/if}

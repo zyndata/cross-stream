@@ -7,6 +7,10 @@ import "context"
 // LoopGuard reports whether LAN uses Blocked (the nft loop guard).
 const LoopGuard = true
 
+// OwnTrafficAlways reports whether the laptop's own traffic always uses the tunnel (no
+// switch). False on Linux: LAN.OwnTraffic decides (phase 21).
+const OwnTrafficAlways = false
+
 // Setup enables IPv4 forwarding and installs the policy rules and the nft
 // table, replacing leftovers of a crashed run. Routes need the ports up:
 // call Ensure next (and from the watchdog).

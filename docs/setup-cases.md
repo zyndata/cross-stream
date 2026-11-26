@@ -121,6 +121,31 @@ Adapted from common VPN server hardening practice.
 - Fallback if Mobile Hotspot refuses on some adapter: a travel router in AP mode on Ethernet with the
   hub headless on that port (as on Linux, `-headless -lan-iface`).
 
+## 5b. Hub laptop's own traffic (phase 21)
+
+- **Linux:** *Ustawienia → Ruch tego laptopa przez CrossStream* / `xs-hubctl settings
+  -own-traffic on`. Check from the laptop: `curl https://ifconfig.me` shows the server's address
+  in BONDED, a relay's carrier address in DIRECT; `ip rule` lists 101/102; `resolvectl dns xs0`
+  shows the tunnel address. Open connections restart once when it switches.
+- With no carrying path (OFFLINE/CONNECTING) the rules go away and the laptop uses its own
+  links; with no own link it is offline, as without the switch.
+- No `systemd-resolved` (plain `/etc/resolv.conf`): DNS stays as configured; a server on the
+  home LAN (router) is still asked outside the tunnel. The GUI says so.
+- Docker on the laptop: containers follow the laptop (forwarded `docker0` traffic uses table
+  100; Docker's own masquerade covers `xs0`).
+- NetworkManager's connectivity check binds to each device: rule 99 (`oif <link> lookup main`,
+  one per link with a default route) keeps it working, so NM does not mark the Ethernet
+  "limited" and push its route behind a metered modem (field test 2026-11-25).
+- `xs-hubctl enroll -via` / `probe -via` without root: the socket gets no mark, so with the
+  switch on it goes into the tunnel; turn the switch off for such tests.
+- Captive portal while on: the browser's portal page lookup goes to the tunnel resolver;
+  log in through the local link with *Log in* (host route), or turn the switch off for the
+  login.
+- **Windows:** always on. `netsh wfp show filters` lists the CrossStream sublayer's filters
+  while a path carries traffic; after a hub stop or `taskkill /f` of xs-hubd none is left
+  (dynamic WFP session). DirectAccess / corporate VPNs with their own DNS policy rules (NRPT)
+  are not supported on a hub laptop.
+
 ## 6. Hub hardware options
 - OpenWrt routers (ARM/x86, no MIPS) and Raspberry Pi 4/5 can host a hub — a small
   dedicated box instead of a laptop. Notes if we ever do it: un-bridge WANs, unique

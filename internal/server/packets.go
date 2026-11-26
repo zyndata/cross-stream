@@ -81,6 +81,8 @@ func (s *Server) handleInit(c session.Sender, from netip.AddrPort, h wire.Header
 		if hub, ok = s.enrollHub(init, peer, from); !ok {
 			return
 		}
+	} else if init.EnrollToken != nil {
+		hub = s.enrollKnown(init, peer, hub, from)
 	}
 	if !s.freshInit(hub.Name, init.TS) {
 		s.counters.replayed.Add(1)
@@ -149,6 +151,33 @@ func (s *Server) enrollHub(init session.InitPayload, peer [crypto.KeyLen]byte, f
 	}
 	s.log.Info("hub enrolled", "hub", hub.Name, "tunnel_ip", hub.TunnelIP, "from", from)
 	return hub, true
+}
+
+// enrollKnown handles a code sent by an enrolled key (the hub enrolled again
+// without being removed first): a valid code renames the hub to the code's
+// name (State.EnrollKnown); anything else is ignored and the hub stays as it
+// was. Hubs keep sending the code until their enrollment is confirmed, so a
+// used code here is normal. A session under the old name is dropped without
+// CLOSE: this INIT is the hub's new session.
+func (s *Server) enrollKnown(init session.InitPayload, peer [crypto.KeyLen]byte, hub HubRecord, from netip.AddrPort) HubRecord {
+	tok, err := enroll.ParseToken(*init.EnrollToken)
+	if err != nil {
+		return hub
+	}
+	nh, err := s.o.State.EnrollKnown(tok, peer)
+	if err != nil {
+		if !errors.Is(err, enroll.ErrTokenInvalid) {
+			s.log.Info("enrollment of an enrolled hub ignored", "hub", hub.Name, "from", from, "err", err)
+		}
+		return hub
+	}
+	if nh.Name != hub.Name {
+		if hs := s.moveName(hub.Name, nh.Name); hs != nil {
+			s.removeSession(hs)
+		}
+	}
+	s.log.Info("hub enrolled again", "hub", nh.Name, "old_name", hub.Name, "tunnel_ip", nh.TunnelIP, "from", from)
+	return nh
 }
 
 // handleData opens a DATA packet and acts on its frames.

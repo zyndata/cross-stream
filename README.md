@@ -10,7 +10,7 @@ self-hosted, end-to-end encrypted, shared as a Wi-Fi hotspot.**
 ![Platforms](https://img.shields.io/badge/hub-Linux%20%7C%20Windows-informational)
 ![Relay](https://img.shields.io/badge/relay-Android%2010%2B-green)
 
-> **Status:** beta — latest release `v0.10.0`. The field test (real carriers, a day
+> **Status:** beta — latest release `v0.11.0`. The field test (real carriers, a day
 > away from home) is still in progress; `v1.0.0` follows it. Everything below works and is
 > tested in the Docker test environment, and most of it on real phones and laptops —
 > see [Status and limitations](#status-and-limitations) for what is not yet tried on hardware.
@@ -163,15 +163,15 @@ speed (a home server on 600/100 fibre gives at most ~100 Mb/s).
    the laptop's Wi-Fi becomes the CrossStream hotspot.
 3. **Pair the phones** — the hub app shows a QR code; each friend installs the
    [relay app](#install-relay-app-android), taps **Add hub**, scans the code and flips the switch.
-4. **Enroll the hub** — on the server create a one-time code (web panel → *Huby* → *Dodaj hub*,
+4. **Enroll the hub** — on the server create a one-time code (web panel → *Hubs* → *Add hub*,
    or `xs-ctl enroll <name>`), paste it into the hub app (or `xs-hubctl enroll <code>`).
    On first start the hub app walks you through it: pair a phone first, then paste the code;
    the hub reaches the server through the phone. Without a phone it uses a local link or the
    laptop's own internet — that fails when the server is in the same home network behind a
    router without hairpin NAT.
-   A code for another server (hub app → *Ustawienia* → *Zarejestruj ponownie*) replaces the
+   A code for another server (hub app → *Settings* → *Enroll again*) replaces the
    current server. If the new server does not answer at once, the hub still switches to it and
-   keeps trying through the phones until it does (banner "Czekam na odpowiedź nowego serwera").
+   keeps trying through the phones until it does (banner "Waiting for the new server to answer").
 5. **Connect** — join the hotspot from any device. The hub app shows the mode
    (bonded / direct / offline), every phone's speed, signal and data used.
 
@@ -228,7 +228,7 @@ and changes it there:
 
 | Server | Where the port lives | Change it with |
 |---|---|---|
-| Docker | `public_port` in `data/server.yaml` (or `XS_SERVER_PUBLIC_PORT`, then read-only) | the web panel (*Serwer* → *Port tunelu*), `xs-ctl tunnel-port 51901`, or the file |
+| Docker | `public_port` in `data/server.yaml` (or `XS_SERVER_PUBLIC_PORT`, then read-only) | the web panel (*Server* → *Tunnel port*), `xs-ctl tunnel-port 51901`, or the file |
 | Home Assistant | the app's *Network* section (`51900/udp` and `51900/tcp`, same port) | that section, the web panel or `xs-ctl tunnel-port 51901` |
 
 A new port applies after a **restart**: until then the web panel shows *Wymagany restart*
@@ -241,7 +241,8 @@ the router must translate it to the server's 51900, or change the published port
 > can no longer connect. The server log, `xs-ctl list` and the panel (*Huby*, "zarejestruj
 > ponownie") name those hubs. Remove each one and enroll it again with a new code
 > (`xs-ctl revoke <name>`, `xs-ctl enroll <name>`, paste the code in the hub). Relay phones need
-> nothing: they follow their hub.
+> nothing: they follow their hub. With a server built after v0.10.0 removing is optional: a new
+> code pasted into an enrolled hub moves it to the code's name and port.
 
 ### Docker Desktop on Windows (testing only)
 
@@ -272,6 +273,16 @@ next to it (cards that allow it) or disconnect. Everything the hub changes in th
 setup is removed again when it stops. Uninstall: `sudo sh install.sh --uninstall`.
 More: [deploy/hub/README.md](deploy/hub/README.md).
 
+**The hub laptop's own apps** (browser, Discord, updates) use the laptop's own links by
+default on Linux — and once the hub takes the built-in Wi-Fi for the hotspot, there may be
+none left. Turn on *Settings → This laptop's traffic through CrossStream* (or
+`xs-hubctl settings -own-traffic on`) to send them through the phones too; open connections
+restart once. While no phone or link carries traffic, the laptop falls back to its own links.
+The laptop's DNS then goes through the hub (needs `systemd-resolved`, the Ubuntu default;
+without it the GUI says DNS stays as it was) and its IPv6 is refused so apps use IPv4
+inside the tunnel. Docker containers on the laptop follow the laptop. Programs bound to one
+link on purpose (NetworkManager's connectivity check, `curl --interface eth0`) keep using it.
+
 ### Windows
 
 1. Unpack `crossstream-hub-vX.Y.Z-windows-amd64.zip`.
@@ -288,6 +299,12 @@ The hotspot uses Windows' *Mobile hotspot* (subnet `192.168.137.0/24`). Don't ch
 *Do nothing* on AC power. Uninstall: `install.ps1 -Uninstall`. More:
 [docs/setup-cases.md](docs/setup-cases.md#5-windows-hub-phase-16).
 
+The laptop's own traffic always goes through CrossStream on Windows while a phone or link
+carries traffic (the switch in *Settings* stays on). Firewall filters then keep its DNS
+lookups inside the tunnel and refuse IPv6 so apps use IPv4; they disappear when the hub
+stops or crashes. A laptop with its own DNS policy rules (DirectAccess, some corporate VPN
+clients) is not a supported Windows hub: its DNS servers outside the tunnel are blocked.
+
 The Windows hub reacts to network changes at once (a phone plugged in for USB tethering shows
 up within about a second) and runs at *above normal* process priority so forwarding keeps up
 while the laptop is busy; add `-normal-priority` to the service command line to turn that off.
@@ -296,12 +313,12 @@ while the laptop is busy; add `-normal-priority` to the service command line to 
 
 Besides the relay phones, the hub can bond its own internet interfaces: a phone on USB
 tethering (no app needed), Bluetooth PAN, Ethernet, a USB modem or the laptop's SIM. They
-show up switched off under *Łącza lokalne* (local links) in the hub app, or
+show up switched off under *Local links* in the hub app, or
 `xs-hubctl uplinks`. A USB-tethered Android phone must have its Wi-Fi off.
 
 A link behind a login page (hotel, train, café Wi-Fi shared over USB) is detected when it
 comes up or stops working: it shows *Wymaga logowania* and stays out of the bond until you
-log in. *Zaloguj* in the hub app (or `xs-hubctl uplinks captive <link> -open`) opens the
+log in. *Log in* in the hub app (or `xs-hubctl uplinks captive <link> -open`) opens the
 login page in your browser through that link; the hub checks again every 30 s for 10 minutes.
 
 ## Install: relay app (Android)
@@ -316,18 +333,19 @@ login page in your browser through that link; the hub checks again every 30 s fo
 Settings a friend controls (the hub cannot override them): data limit per
 session / day / month (stop or slow down when reached), battery threshold (default 20 %),
 how this hub may use the phone (normal / only when needed / only as backup), start on boot.
-The app remembers several hubs and connects by itself to the strongest one in range.
+The app remembers several hubs (rename them on the phone: tap a hub → *Rename*) and connects by
+itself to the chosen one or else the strongest one in range; *Switch to … now* moves to the chosen hub at once.
 Pull the main screen down to refresh which hubs are in range right away (Android allows a few
 Wi-Fi scans per two minutes; after that the last scan is shown).
 App language: English or Polish.
 
 ## Everyday use
 
-**Hub app** (Polish interface): QR for pairing, table of phones and local links (speed,
-RTT / jitter / loss, data used, battery, signal hints), per-link priority / limits, mode and
-redundancy, *Przyspieszanie TCP* (TCP accelerator), link speed test, 5-minute throughput chart,
-hotspot settings, server enrollment, usage statistics (*Statystyki*), log export (with a
-15-minute *Szczegółowe logi* switch), updates.
+**Hub app** (English or Polish: *Settings* → *Language*, Automatic follows the system language):
+QR for pairing, table of phones and local links (speed, RTT / jitter / loss, data used, battery,
+signal hints), per-link priority / limits, mode and redundancy, *TCP acceleration*, link speed
+test, 5-minute throughput chart, hotspot settings, server enrollment, usage statistics
+(*Statistics*), log export (with a 15-minute *Detailed logs* switch), updates.
 
 **Hub CLI** — everything the app does, scriptable:
 
@@ -358,7 +376,8 @@ hotspot, so their lookups reach the hub and the domain bypass works for them too
 | **DIRECT** | Server unreachable for ~15 s: each connection leaves through one phone's own internet, not bonded and *not through the tunnel* (the app warns you). Back to BONDED automatically. |
 | **OFFLINE** | No working link. |
 
-**Server**: web panel (Polish interface) with hubs online, live paths per hub, throughput
+**Server**: web panel (English or Polish: the switch in its header, remembered per browser;
+Automatic follows the browser language, under Home Assistant your HA user language) with hubs online, live paths per hub, throughput
 chart, enrollment codes, rename / revoke, port-forward allowances, the tunnel port (with a
 restart button) and an audit log.
 
@@ -367,7 +386,7 @@ restart button) and an audit log.
 | Part | How |
 |---|---|
 | Relay app | Checks when opened (can be switched off in Settings → Updates); installs through the Android installer on request. |
-| Hub app | Checks at start (Ustawienia → Aktualizacje); downloads the hub package, verifies its SHA-256 and installs it after an admin prompt (pkexec / UAC). |
+| Hub app | Checks at start (Settings → Updates); downloads the hub package, verifies its SHA-256 and installs it after an admin prompt (pkexec / UAC). |
 | Hub CLI | `xs-hubctl update` shows what's new; `sudo xs-hubctl update -install` installs it. Never checks on its own. |
 | Server | Docker: load the new image and restart (or `deploy/server/remote-deploy.sh`, which rolls back by itself on failure). Home Assistant: the *Update* button. |
 
@@ -390,7 +409,9 @@ when a release notes a protocol change.
   your server is then not involved, and carriers see the destinations.
 - **IPv4 only**: IPv6 is turned off on the hotspot so nothing leaks around the tunnel.
 - **Logs** keep no per-connection records and no keys; exported logs are redacted.
-- **Windows hub:** while it runs, the laptop's own traffic also goes through the tunnel.
+- **Hub laptop's own traffic:** Windows — always through the tunnel while a path carries
+  traffic, DNS and IPv6 kept from leaking past it; Linux — only with the own-traffic switch on
+  ([details](#linux)), otherwise it leaves through the laptop's own links.
 
 ## Mobile data, carriers and battery
 
@@ -417,12 +438,14 @@ on coverage and carriers.
 the TCP/WebSocket transport fallback (and its several TCP connections per link), bypass list, port forwarding, usage history and
 notifications on a real hub, local links other than the SIM modem and USB tethering on Windows, automatic hotspot channel,
 login-page (captive portal) detection on local links, the Firefox / Private Relay DNS answers.
-**Built, not yet tried on hardware:** Windows 10 hub, first in-app update to a newer release.
+**Tested on a Linux hub laptop (Dell, one phone + SIM modem):** the laptop's own traffic through
+CrossStream (IPv6 on a link with global IPv6 not yet tried).
+**Built, not yet tried on hardware:** Windows 10 hub, first in-app update to a newer release,
+the Windows DNS/IPv6 leak filters on a laptop hub.
 
 **Not supported:** iPhone relays (an iPhone works as a USB-tethered local link on Linux, best
-effort), Google Play, IPv6 inside the tunnel, port forwarding on a Windows hub, multi-user
-servers. The hub app and the web panel are in **Polish only** for now (the relay app is
-English / Polish).
+effort), per-app choice for the hub laptop's own traffic (all or nothing), Google Play, IPv6 inside the tunnel, port forwarding on a Windows hub, multi-user
+servers. Languages: English and Polish only (relay app, hub app and web panel).
 
 ## Troubleshooting
 
@@ -433,10 +456,10 @@ English / Polish).
 | Phones connect, no internet (Docker on Linux) | `sudo iptables -L FORWARD -n \| head -1` must say `policy ACCEPT` — see the pitfall in [deploy/server/README.md](deploy/server/README.md). |
 | Hotspot doesn't start (Linux) | `rfkill unblock wifi`; a card without AP mode needs another (USB) Wi-Fi card; set your country (`xs-hubctl hotspot -country PL`) for 5 GHz. |
 | Phone can't join the hub's Wi-Fi | Close screen-filter / night-mode apps (they block Android's Wi-Fi dialog) and retry. After changing the hotspot name or password, pair again. |
-| Local link shows *Wymaga logowania* | Tap *Zaloguj* (or `xs-hubctl uplinks captive <link> -open`) and log in. If the page does not open, log in on the phone itself or stop the hub for a moment. |
+| Local link shows *Login required* | Tap *Log in* (or `xs-hubctl uplinks captive <link> -open`) and log in. If the page does not open, log in on the phone itself or stop the hub for a moment. |
 | Relaying stops on Samsung / Xiaomi | Battery settings → allow background activity for CrossStream. |
 | Slow downloads | Turn on the TCP accelerator; check each phone with the speed test; phones on the same cell share it; a home server caps downloads at its upload speed. |
-| Something else | Hub app → *Eksportuj logi* (or `xs-hubctl logs`), relay app → *Share logs*: both are redacted. Open an issue with them. |
+| Something else | Hub app → *Export logs* (or `xs-hubctl logs`), relay app → *Share logs*: both are redacted. Open an issue with them. |
 
 Practical setups and pitfalls: [docs/setup-cases.md](docs/setup-cases.md).
 
@@ -461,11 +484,27 @@ Layout: [docs/repo-structure.md](docs/repo-structure.md). Test environment:
 
 Highlights of each release, newest first. Every change: [CHANGELOG.md](CHANGELOG.md).
 
+### v0.11.0 — 2026-11-26
+
+- Hub laptop's own traffic: on Linux the laptop's own apps can use the bonded connection too
+  (*Settings → This laptop's traffic through CrossStream* or `xs-hubctl settings -own-traffic on`);
+  on Windows it is always on, with DNS and IPv6 kept from leaking past the tunnel.
+- Hub app and web panel in English and Polish: *Settings → Language* in the hub app, the switch in
+  the panel's header; *Automatic* follows the system or browser language.
+- Relay app: the chosen hub is joined as soon as it comes into range, *Switch to … now* moves there
+  at once, and saved hubs can be renamed on the phone.
+- Server: a stalled TCP connection no longer drops a download on a TCP/WebSocket link; a new code
+  for an already enrolled hub renames it instead of being ignored.
+- Hub: a phone forgotten and paired again keeps one entry in the statistics; on Linux, stopping
+  the hub reconnects the laptop to the Wi-Fi network the hotspot took it from.
+- **Upgrade:** no special order (protocol unchanged); update the server too (Home Assistant:
+  *Update*) for the server fixes.
+
 ### v0.10.0 — 2026-11-22
 
 - Hub: a code for another server now always moves the hub to it. If the server's answer gets
-  lost on the way, the hub keeps retrying through the phones (banner "Czekam na odpowiedź
-  nowego serwera", `enroll_pending` in `xs-hubctl status`) instead of staying on the old
+  lost on the way, the hub keeps retrying through the phones (banner "Waiting for the new
+  server to answer", `enroll_pending` in `xs-hubctl status`) instead of staying on the old
   server in direct mode.
 - Hub: phones no longer switch between UDP and TCP in the middle of an enrollment; when the
   server does not answer, the hub app suggests trying the same code again.

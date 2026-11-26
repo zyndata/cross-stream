@@ -3,6 +3,7 @@
   // readable form on the server), with a copy button and its expiry.
   import { api } from '../lib/api.js'
   import { when } from '../lib/format.js'
+  import { t } from '../i18n/i18n.svelte.js'
 
   let { onclose, ondone } = $props()
   let name = $state('')
@@ -44,7 +45,7 @@
     if (document.execCommand?.('copy')) {
       copied = true
     } else {
-      error = 'Nie udało się skopiować — kod jest zaznaczony, naciśnij Ctrl+C.'
+      error = t('enroll.copyFailed')
     }
   }
 </script>
@@ -53,25 +54,25 @@
 
 <div class="backdrop" role="presentation" onclick={(e) => e.target === e.currentTarget && onclose()}>
   <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="enroll-title">
-    <h3 id="enroll-title">Dodaj hub</h3>
+    <h3 id="enroll-title">{t('hubs.add')}</h3>
     {#if !result}
       <form onsubmit={create}>
-        <label>Nazwa huba <input bind:value={name} maxlength="64" required /></label>
-        <p class="muted small">Serwer utworzy jednorazowy kod XS1. Wpisz go na hubie (GUI albo <code>xs-hubctl enroll</code>).</p>
+        <label>{t('enroll.name')} <input bind:value={name} maxlength="64" required /></label>
+        <p class="muted small">{t('enroll.hint1')} <code>xs-hubctl enroll</code>{t('enroll.hint2')}</p>
         {#if error}<div class="banner bad">{error}</div>{/if}
         <div class="buttons">
-          <button type="button" onclick={onclose}>Anuluj</button>
-          <button class="primary" disabled={busy || !name.trim()}>Utwórz kod</button>
+          <button type="button" onclick={onclose}>{t('common.cancel')}</button>
+          <button class="primary" disabled={busy || !name.trim()}>{t('enroll.create')}</button>
         </div>
       </form>
     {:else}
-      <p>Kod dla huba <b>{name.trim()}</b> — pokazany tylko teraz:</p>
+      <p>{t('enroll.codeFor')} <b>{name.trim()}</b> {t('enroll.onlyNow')}</p>
       <textarea bind:this={codeArea} readonly rows="4" value={result.code} onfocus={(e) => e.currentTarget.select()}></textarea>
-      <p class="muted small">Ważny do {when(result.expires)}. Po zamknięciu okna kodu nie da się wyświetlić ponownie.</p>
+      <p class="muted small">{t('enroll.validUntil', { time: when(result.expires) })}</p>
       {#if error}<div class="banner bad">{error}</div>{/if}
       <div class="buttons">
-        <button onclick={copy}>{copied ? 'Skopiowano' : 'Kopiuj'}</button>
-        <button class="primary" onclick={onclose}>Zamknij</button>
+        <button onclick={copy}>{copied ? t('enroll.copied') : t('enroll.copy')}</button>
+        <button class="primary" onclick={onclose}>{t('common.close')}</button>
       </div>
     {/if}
   </div>

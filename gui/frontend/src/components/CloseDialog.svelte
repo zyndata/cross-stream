@@ -2,6 +2,7 @@
   // Asked on window close while xs-hubd runs (phase 12): keep the hub
   // running in the background, stop it and close, or cancel.
   import { api, errorText } from '../lib/api.js'
+  import { t } from '../i18n/i18n.svelte.js'
 
   let { onclose, notify } = $props()
   let remember = $state(false)
@@ -27,17 +28,17 @@
 
 <div class="backdrop" role="presentation" onclick={(e) => e.target === e.currentTarget && !busy && onclose()}>
   <div class="dialog" role="alertdialog" aria-modal="true" aria-labelledby="close-title">
-    <h3 id="close-title">Zamknąć okno CrossStream Hub?</h3>
-    <p>Hub może dalej działać w tle — hotspot i tunel zostają, okno możesz otworzyć ponownie w każdej chwili.</p>
-    <p class="warn">„Zatrzymaj hub” wyłącza hotspot: podłączone laptopy stracą internet.</p>
+    <h3 id="close-title">{t('closeDlg.title')}</h3>
+    <p>{t('closeDlg.body')}</p>
+    <p class="warn">{t('closeDlg.warn')}</p>
     <label class="check">
       <input type="checkbox" bind:checked={remember} disabled={busy} />
-      Zapamiętaj wybór (zmienisz go w Ustawieniach)
+      {t('closeDlg.remember')}
     </label>
     <div class="buttons">
-      <button onclick={onclose} disabled={busy}>Anuluj</button>
-      <button class="danger-fill" onclick={() => choose('stop')} disabled={busy}>Zatrzymaj hub i zamknij</button>
-      <button bind:this={keepButton} class="primary" onclick={() => choose('keep')} disabled={busy}>Zostaw hub w tle</button>
+      <button onclick={onclose} disabled={busy}>{t('common.cancel')}</button>
+      <button class="danger-fill" onclick={() => choose('stop')} disabled={busy}>{t('closeDlg.stop')}</button>
+      <button bind:this={keepButton} class="primary" onclick={() => choose('keep')} disabled={busy}>{t('close.pref.keep')}</button>
     </div>
   </div>
 </div>

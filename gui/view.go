@@ -54,6 +54,10 @@ type View struct {
 	Relays       []RelayView   `json:"relays"`
 	Uplinks      []UplinkView  `json:"uplinks"`
 	LogLevel     *logLevel     `json:"log_level,omitempty"` // nil: an older xs-hubd
+	// OwnTraffic: this laptop's own traffic through CrossStream (nil: an
+	// older xs-hubd); OwnDNS "system" = no systemd-resolved (Linux).
+	OwnTraffic *bool  `json:"own_traffic,omitempty"`
+	OwnDNS     string `json:"own_traffic_dns,omitempty"`
 }
 
 // Sample is one point of the throughput chart.
@@ -143,6 +147,7 @@ func (t *tracker) view(st hubStatus, now time.Time) View {
 	v := View{State: stateOK, Hub: st.Hub, Mode: st.Mode, ModeSince: st.ModeSince, Clients: st.Clients,
 		Enrolled: st.Enrolled, Pending: st.Pending, TunnelUp: st.TunnelUp, TunnelError: st.TunnelError, ServerEP: st.ServerEP,
 		Direct: st.Direct, PEP: st.PEP, Warnings: st.Warnings, LogLevel: st.LogLevel, OverflowMbps: st.OverflowMbps, BondMode: st.BondMode,
+		OwnTraffic: st.OwnTraffic, OwnDNS: st.OwnDNS,
 		Redundancy: st.Redundancy, Redundant: st.Redundant, Testing: st.Testing, Relays: []RelayView{}, Uplinks: []UplinkView{}}
 	seen := make(map[string]bool, len(st.Relays))
 	for _, r := range st.Relays {

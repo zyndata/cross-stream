@@ -119,7 +119,7 @@ func (a *App) startHub(ctx context.Context) {
 	}
 }
 
-// StartHub starts xs-hubd from the GUI ("Uruchom usługę").
+// StartHub starts xs-hubd from the GUI ("Start the service").
 func (a *App) StartHub() {
 	a.mu.Lock()
 	ctx := a.ctx

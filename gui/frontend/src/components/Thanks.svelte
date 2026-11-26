@@ -2,6 +2,7 @@
   import { onMount } from 'svelte'
   import { api, errorText } from '../lib/api.js'
   import { megabytes } from '../lib/fmt.js'
+  import { t } from '../i18n/i18n.svelte.js'
 
   let { notify } = $props()
   let rep = $state(null)
@@ -16,8 +17,8 @@
   }
   onMount(() => {
     load()
-    const t = setInterval(load, 60_000)
-    return () => clearInterval(t)
+    const timer = setInterval(load, 60_000)
+    return () => clearInterval(timer)
   })
 
   const pad = (n) => String(n).padStart(2, '0')
@@ -60,18 +61,18 @@
 </script>
 
 <div class="card">
-  <h2>Statystyki</h2>
+  <h2>{t('app.tab.stats')}</h2>
   {#if !rep}
-    <p class="muted">Ładuję…</p>
+    <p class="muted">{t('common.loading')}</p>
   {:else if !friends.length}
-    <p class="muted">Jeszcze brak historii — pojawi się, gdy telefony zaczną udostępniać dane.</p>
+    <p class="muted">{t('stats.empty')}</p>
   {:else}
     <p>
-      W tym miesiącu telefony udostępniły <b>{megabytes(mb(monthTotal))}</b>.
-      Bezprzerwowe przełączenia przy odejściu telefonu: <b>{rep.failovers}</b>.
+      {t('stats.month')} <b>{megabytes(mb(monthTotal))}</b>.
+      {t('stats.failovers')} <b>{rep.failovers}</b>.
     </p>
     <table>
-      <thead><tr><th>#</th><th>Telefon</th><th class="num">Ten miesiąc</th><th class="num">Od początku</th></tr></thead>
+      <thead><tr><th>#</th><th>{t('common.phone')}</th><th class="num">{t('stats.thisMonth')}</th><th class="num">{t('stats.allTime')}</th></tr></thead>
       <tbody>
         {#each friends as f, i}
           <tr>
@@ -83,8 +84,8 @@
         {/each}
       </tbody>
     </table>
-    <h3>Ostatnie {DAYS} dni</h3>
-    <svg viewBox="0 0 {W} {H + 16}" role="img" aria-label="Dane udostępnione na dzień">
+    <h3>{t('stats.lastDays', { n: DAYS })}</h3>
+    <svg viewBox="0 0 {W} {H + 16}" role="img" aria-label={t('stats.chartLabel')}>
       {#each days as d, i}
         {@const h = (d.total / peak) * H}
         <rect x={(i * W) / DAYS + 1} y={H - h} width={W / DAYS - 2} height={Math.max(h, d.total ? 1 : 0)} rx="2">
@@ -93,10 +94,10 @@
       {/each}
       <line x1="0" x2={W} y1={H} y2={H} />
       <text x="0" y={H + 13}>{days[0].date}</text>
-      <text x={W} y={H + 13} text-anchor="end">dziś</text>
+      <text x={W} y={H + 13} text-anchor="end">{t('stats.today')}</text>
     </svg>
     {#if rep.speed_tests?.length}
-      <p class="muted small">Ostatni test łączy: {rep.speed_tests[0].down_mbps} Mb/s pobierania, {rep.speed_tests[0].up_mbps} Mb/s wysyłania.</p>
+      <p class="muted small">{t('stats.lastTest', { down: rep.speed_tests[0].down_mbps, up: rep.speed_tests[0].up_mbps })}</p>
     {/if}
   {/if}
 </div>

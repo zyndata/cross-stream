@@ -11,6 +11,7 @@ import (
 	"net"
 	"net/netip"
 	"sync"
+	"syscall"
 	"time"
 )
 
@@ -35,6 +36,8 @@ type Config struct {
 	Listen    []netip.AddrPort // e.g. 10.42.0.1:53 (UDP and TCP)
 	Upstreams []netip.AddrPort
 	Dial      DialFunc // nil = net.Dialer (tests); the hub binds it to the tunnel
+	// Control, if set, runs on every listening socket (the hub marks them).
+	Control   func(network, address string, c syscall.RawConn) error
 	Timeout   time.Duration
 	CacheSize int
 	Log       *slog.Logger
@@ -120,13 +123,20 @@ func (s *Server) Run(ctx context.Context) {
 	wg.Wait()
 }
 
+// Serve serves one more listen address until ctx ends (the hub's tunnel
+// address, known only once enrolled); like Run, it retries every 2 s while
+// the address cannot be bound.
+func (s *Server) Serve(ctx context.Context, a netip.AddrPort) { s.serveAddr(ctx, a) }
+
 func (s *Server) serveAddr(ctx context.Context, a netip.AddrPort) {
 	logged := false
+	lc := net.ListenConfig{Control: s.cfg.Control}
 	for ctx.Err() == nil {
-		pc, err := net.ListenUDP("udp", net.UDPAddrFromAddrPort(a))
+		p, err := lc.ListenPacket(ctx, "udp", a.String())
 		if err == nil {
+			pc := p.(*net.UDPConn)
 			var ln net.Listener
-			if ln, err = net.ListenTCP("tcp", net.TCPAddrFromAddrPort(a)); err == nil {
+			if ln, err = lc.Listen(ctx, "tcp", a.String()); err == nil {
 				s.log.Info("dns listening", "addr", a)
 				go func() { <-ctx.Done(); _ = pc.Close(); _ = ln.Close() }()
 				go s.serveTCP(ctx, ln)

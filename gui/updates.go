@@ -63,6 +63,7 @@ type updatePrefs struct {
 // and on request, and installs it through xs-hubctl update -apply, elevated.
 type updater struct {
 	version string
+	tr      *texts // language of the messages in UpdateView.Error
 	exe     string // this executable
 	path    string // prefs file ("" = not saved)
 	client  *update.Client
@@ -78,8 +79,8 @@ type updater struct {
 	release update.Release
 }
 
-func newUpdater(version string) *updater {
-	u := &updater{version: version, client: update.NewClient(version), elevate: update.RunElevated,
+func newUpdater(version string, tr *texts) *updater {
+	u := &updater{version: version, tr: tr, client: update.NewClient(version), elevate: update.RunElevated,
 		startRetry: []time.Duration{30 * time.Second, 2 * time.Minute}}
 	if exe, err := os.Executable(); err == nil {
 		if r, err := filepath.EvalSymlinks(exe); err == nil {
@@ -162,12 +163,12 @@ func (u *updater) Check(ctx context.Context) (UpdateView, error) {
 	u.mu.Unlock()
 	r, err := u.client.Latest(ctx)
 	if err != nil {
-		msg := "Nie udało się sprawdzić aktualizacji (brak połączenia z GitHubem?)."
+		msg := u.tr.T("go.upd.checkFailed", nil)
 		switch {
 		case errors.Is(err, update.ErrNoRelease):
-			msg = "Nie ma jeszcze opublikowanego wydania."
+			msg = u.tr.T("go.upd.noRelease", nil)
 		case errors.Is(err, update.ErrRateLimited):
-			msg = "GitHub chwilowo ogranicza zapytania z tego adresu. Spróbuj ponownie za godzinę."
+			msg = u.tr.T("go.upd.rateLimited", nil)
 		}
 		v := u.set(func(v *UpdateView) { v.State, v.Error = updIdle, msg })
 		return v, fmt.Errorf("check for updates: %w", err)
@@ -243,11 +244,11 @@ func (u *updater) install(ctx context.Context, emit func(UpdateView)) bool {
 	ctl, prefix := u.hubctl()
 	a, found := r.HubArchive(goruntime.GOOS, goruntime.GOARCH)
 	if ctl == "" || !found {
-		return fail("Ten hub nie może zainstalować aktualizacji sam — pobierz ją ze strony wydania.")
+		return fail(u.tr.T("go.upd.cannotInstall", nil))
 	}
 	want, err := u.client.Sum(ctx, r, a.Name)
 	if err != nil {
-		return fail("Nie udało się pobrać sumy kontrolnej: " + err.Error())
+		return fail(u.tr.T("go.upd.sumFailed", map[string]any{"error": err.Error()}))
 	}
 	dir, err := os.MkdirTemp("", "crossstream-update-")
 	if err != nil {
@@ -260,10 +261,10 @@ func (u *updater) install(ctx context.Context, emit func(UpdateView)) bool {
 		}
 	})
 	if errors.Is(err, update.ErrStalled) {
-		return fail("Pobieranie przerwane: przez minutę nie przyszły żadne dane (uśpienie komputera albo utrata sieci?). Spróbuj ponownie.")
+		return fail(u.tr.T("go.upd.stalled", nil))
 	}
 	if err != nil {
-		return fail("Pobieranie nie powiodło się: " + err.Error())
+		return fail(u.tr.T("go.upd.downloadFailed", map[string]any{"error": err.Error()}))
 	}
 	emit(u.set(func(v *UpdateView) { v.State, v.Progress = updInstalling, 100 }))
 	logPath := filepath.Join(dir, "install.log")
@@ -272,7 +273,7 @@ func (u *updater) install(ctx context.Context, emit func(UpdateView)) bool {
 	}
 	err = u.elevate(ctx, ctl, "update", "-apply", path, "-sha256", want, "-gui-prefix", prefix, "-log", logPath)
 	if errors.Is(err, update.ErrCanceled) {
-		return fail("Instalacja anulowana.")
+		return fail(u.tr.T("go.upd.canceled", nil))
 	}
 	if err != nil {
 		msg := err.Error()
@@ -280,9 +281,9 @@ func (u *updater) install(ctx context.Context, emit func(UpdateView)) bool {
 			msg = lastLines(string(b), 3)
 		}
 		if strings.Contains(msg, update.ErrBusy.Error()) {
-			return fail("Inna instalacja aktualizacji właśnie trwa (drugie okno albo xs-hubctl update). Spróbuj, gdy się skończy.")
+			return fail(u.tr.T("go.upd.busy", nil))
 		}
-		return fail("Instalacja nie powiodła się: " + msg)
+		return fail(u.tr.T("go.upd.installFailed", map[string]any{"error": msg}))
 	}
 	return true
 }
@@ -299,7 +300,7 @@ func lastLines(s string, n int) string {
 func (a *App) UpdateInfo() UpdateView { return a.upd.View() }
 
 // CheckUpdate checks for a newer release now; a failure is in the view's
-// Error (Polish), the cause in the log.
+// Error (UI language), the cause in the log.
 func (a *App) CheckUpdate() (UpdateView, error) {
 	v, err := a.upd.Check(a.context())
 	if err != nil {
@@ -324,7 +325,7 @@ func (a *App) DismissUpdate() error {
 func (a *App) InstallUpdate() error {
 	v := a.upd.View()
 	if !v.CanInstall || v.State != updIdle {
-		return errors.New("error: aktualizacja niedostępna")
+		return errors.New("error: " + a.tr.T("go.upd.unavailable", nil))
 	}
 	ctx := a.context()
 	go func() {

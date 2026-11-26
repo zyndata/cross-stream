@@ -66,7 +66,7 @@ func TestCaptiveLogin(t *testing.T) {
 	}, slog.New(slog.DiscardHandler))
 
 	var opened []string
-	a := &App{sock: sock, log: slog.New(slog.DiscardHandler), openURL: func(u string) { opened = append(opened, u) }}
+	a := &App{tr: testTexts(langPL), sock: sock, log: slog.New(slog.DiscardHandler), openURL: func(u string) { opened = append(opened, u) }}
 	tests := []struct {
 		id, msg string
 		opened  int
@@ -74,7 +74,7 @@ func TestCaptiveLogin(t *testing.T) {
 		{"open", "Internet działa — logowanie nie jest potrzebne", 0},
 		{"none", "Brak internetu na tym łączu", 0},
 		{"portal", "", 1},
-		{"noroute", hub.CaptiveHint, 1},
+		{"noroute", "Zaloguj się w tej sieci na telefonie lub wyłącz hub na chwilę", 1},
 	}
 	for _, tc := range tests {
 		msg, err := a.CaptiveLogin(tc.id)

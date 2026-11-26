@@ -1,6 +1,7 @@
 <script>
   import { api, errorText } from '../lib/api.js'
   import RelayRow from './RelayRow.svelte'
+  import { t } from '../i18n/i18n.svelte.js'
 
   let { view, notify } = $props()
   let overflow = $state('')
@@ -13,12 +14,12 @@
   async function saveOverflow() {
     const v = Number(overflow)
     if (!Number.isInteger(v) || v < 0 || v > 65535) {
-      notify('Próg musi być liczbą całkowitą 0–65535 Mb/s', true)
+      notify(t('relays.overflowError'), true)
       return
     }
     try {
       await api.setOverflow(v)
-      notify(v ? `Telefony „dodatkowe” włączą się powyżej ${v} Mb/s` : 'Próg wyłączony')
+      notify(v ? t('relays.overflowSet', { n: v }) : t('relays.overflowOff'))
     } catch (e) {
       notify(errorText(e), true)
     }
@@ -27,25 +28,25 @@
 </script>
 
 <div class="card">
-  <h2>Telefony ({view.relays.filter((r) => r.connected).length} z {view.relays.length} połączonych)</h2>
+  <h2>{t('relays.title', { n: view.relays.filter((r) => r.connected).length, total: view.relays.length })}</h2>
   {#if view.relays.length === 0}
-    <p class="muted">Brak sparowanych telefonów — zeskanuj kod QR w aplikacji CrossStream Relay.</p>
+    <p class="muted">{t('relays.none')}</p>
   {:else}
     <div class="scroll">
       <table>
         <thead>
           <tr>
-            <th>Telefon</th>
-            <th>Stan</th>
-            <th title="Jak telefon łączy się z serwerem: UDP (najlepiej), TCP lub WSS, gdy operator blokuje UDP">Łącze</th>
+            <th>{t('common.phone')}</th>
+            <th>{t('relays.col.state')}</th>
+            <th title={t('relays.col.linkHint')}>{t('relays.col.link')}</th>
             <th class="num">↑ / ↓</th>
-            <th class="num">RTT · jitter · straty</th>
-            <th class="num">Zużyte</th>
-            <th>Priorytet</th>
-            <th>Wysyłanie</th>
-            <th>Pobieranie</th>
-            <th title="Limit prędkości, puste = bez limitu">Limit kb/s</th>
-            <th title="Limit danych, puste = bez limitu">Limit MB</th>
+            <th class="num">{t('relays.col.rtt')}</th>
+            <th class="num">{t('relays.col.used')}</th>
+            <th>{t('relays.col.prio')}</th>
+            <th>{t('relays.col.up')}</th>
+            <th>{t('relays.col.down')}</th>
+            <th title={t('relays.col.rateHint')}>{t('relays.col.rate')}</th>
+            <th title={t('relays.col.capHint')}>{t('relays.col.cap')}</th>
             <th></th>
           </tr>
         </thead>
@@ -58,7 +59,7 @@
     </div>
   {/if}
   <div class="overflow">
-    <label for="overflow">Telefony „dodatkowe” używane dopiero, gdy główne przesyłają mniej niż</label>
+    <label for="overflow">{t('relays.overflow')}</label>
     <input
       id="overflow"
       type="number"
@@ -69,8 +70,8 @@
       onkeydown={(e) => e.key === 'Enter' && saveOverflow()}
     />
     <span>Mb/s</span>
-    <button onclick={saveOverflow}>Zapisz</button>
-    <span class="muted small">(0 = zawsze używaj wszystkich)</span>
+    <button onclick={saveOverflow}>{t('common.save')}</button>
+    <span class="muted small">{t('relays.overflowZero')}</span>
   </div>
 </div>
 

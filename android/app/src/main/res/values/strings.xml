@@ -107,6 +107,12 @@
     <string name="hub_choose_auto">Choose automatically</string>
     <string name="hub_chosen_text">Chosen: this phone joins this hub whenever it is available, also instead of another hub.</string>
     <string name="hub_name_chosen">%1$s · chosen</string>
+    <string name="hub_switch_to">Switch to %1$s now</string>
+    <string name="hub_rename">Rename</string>
+    <string name="hub_rename_label">Name on this phone</string>
+    <string name="hub_rename_hint">Only this phone sees it. Empty = the hub\'s own name (%1$s).</string>
+    <string name="hub_own_name">Hub\'s own name: %1$s</string>
+    <string name="save">Save</string>
     <string name="hub_use_normal_info">Normal — the hub uses this phone like its other links whenever it has traffic.</string>
     <string name="hub_use_needed_info">Only when needed — this phone joins in only when the other links are fully loaded (the hub owner can also set a speed threshold). Usually uses less data.</string>
     <string name="hub_use_backup_info">Only as backup — this phone carries no data while any other link works; it takes over only when all others fail.</string>

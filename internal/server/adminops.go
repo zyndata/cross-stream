@@ -35,20 +35,26 @@ func (s *Server) Rename(_ context.Context, name, newName string) error {
 	if err := s.o.State.Rename(name, newName); err != nil {
 		return err
 	}
-	s.mu.Lock()
-	hs := s.byName[name]
-	if ts, ok := s.initTS[name]; ok {
-		// The hub may have reconnected under the new name already: keep the newest.
-		s.initTS[newName] = max(ts, s.initTS[newName])
-		delete(s.initTS, name)
-	}
-	s.mu.Unlock()
+	hs := s.moveName(name, newName)
 	if hs != nil {
 		_ = hs.sess.Send(&wire.Close{Reason: wire.CloseNormal})
 		s.removeSession(hs)
 	}
 	s.log.Info("hub renamed", "hub", name, "new_name", newName, "reconnect", hs != nil)
 	return nil
+}
+
+// moveName carries the replay guard of a renamed hub over to its new name
+// and returns its session under the old name (nil = none).
+func (s *Server) moveName(name, newName string) *hubSession {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if ts, ok := s.initTS[name]; ok {
+		// The hub may have reconnected under the new name already: keep the newest.
+		s.initTS[newName] = max(ts, s.initTS[newName])
+		delete(s.initTS, name)
+	}
+	return s.byName[name]
 }
 
 // Info implements admin.Backend.

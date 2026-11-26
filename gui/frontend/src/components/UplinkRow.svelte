@@ -2,6 +2,7 @@
   import { api, errorText } from '../lib/api.js'
   import { mbps, megabytes, ms } from '../lib/fmt.js'
   import ConfirmDialog from './ConfirmDialog.svelte'
+  import { t, num } from '../i18n/i18n.svelte.js'
 
   let { u, notify } = $props()
   let asking = $state(false)
@@ -15,7 +16,7 @@
     loggingIn = true
     try {
       const msg = await api.captiveLogin(u.id)
-      notify(msg || `${u.name}: strona logowania otwarta w przeglądarce`, !!msg)
+      notify(msg || t('uplink.loginOpened', { name: u.name }), !!msg)
     } catch (e) {
       notify(errorText(e), true)
     } finally {
@@ -23,29 +24,12 @@
     }
   }
 
-  const kinds = {
-    usb: ['🔌', 'Telefon przez USB'],
-    bluetooth: ['ᛒ', 'Bluetooth (wolne, tylko zapas)'],
-    modem: ['📶', 'Modem / karta SIM'],
-    ethernet: ['🖧', 'Ethernet'],
-    wifi: ['📡', 'Wi-Fi (druga karta)'],
-  }
-  const priorities = [
-    ['normal', 'główny'],
-    ['secondary', 'dodatkowy'],
-    ['backup', 'zapasowy'],
-  ]
-  const directions = [
-    ['on', 'wł.'],
-    ['backup_only', 'awaryjnie'],
-    ['off', 'wył.'],
-  ]
-  const pathState = { alive: 'aktywne', suspect: 'niepewne', sleeping: 'uśpione', dead: 'brak ścieżki' }
-  const periods = [
-    ['session', 'od uruchomienia huba'],
-    ['day', 'na dzień'],
-    ['month', 'na miesiąc'],
-  ]
+  const icons = { usb: '🔌', bluetooth: 'ᛒ', modem: '📶', ethernet: '🖧', wifi: '📡' }
+  const kindName = (k) => (k in icons ? t('uplink.kind.' + k) : k)
+  const priorities = ['normal', 'secondary', 'backup']
+  const directions = ['on', 'backup_only', 'off']
+  const pathStates = ['alive', 'suspect', 'sleeping', 'dead']
+  const periods = ['session', 'day', 'month']
 
   async function set(params, what, el, shown) {
     try {
@@ -64,16 +48,16 @@
   function setRate(e) {
     const v = e.currentTarget.value === '' ? 0 : Number(e.currentTarget.value)
     if (!Number.isInteger(v) || v < 0 || v > 4294967295) {
-      notify('Podaj liczbę całkowitą ≥ 0', true)
+      notify(t('relay.intError'), true)
       return
     }
-    set({ rate_kbps: v }, v ? `limit prędkości ${v} kb/s` : 'limit prędkości wyłączony', e.currentTarget, u.rate_kbps || '')
+    set({ rate_kbps: v }, v ? t('uplink.rateSet', { n: v }) : t('uplink.rateOff'), e.currentTarget, u.rate_kbps || '')
   }
 
   function rename(e) {
     renaming = false
     const name = e.currentTarget.value.trim()
-    if (name && name !== u.name) set({ name }, 'nazwa zmieniona')
+    if (name && name !== u.name) set({ name }, t('uplink.renamed'))
   }
 
   function openLimits() {
@@ -91,11 +75,11 @@
     const cap = editing.cap === '' ? 0 : Number(editing.cap)
     const day = Number(editing.resetDay)
     if (!Number.isInteger(cap) || cap < 0) {
-      notify('Limit danych: liczba całkowita MB ≥ 0', true)
+      notify(t('uplink.capError'), true)
       return
     }
     if (!Number.isInteger(day) || day < 1 || day > 28) {
-      notify('Dzień odnowienia: 1–28', true)
+      notify(t('uplink.dayError'), true)
       return
     }
     const limits = {
@@ -105,18 +89,18 @@
       over_cap: editing.throttle ? 'throttle' : 'stop',
       throttle_kbps: editing.throttle ? 256 : 0,
     }
-    if (await set({ limits, ttl: editing.ttl }, cap ? `limit ${cap} MB zapisany` : 'bez limitu danych')) editing = null
+    if (await set({ limits, ttl: editing.ttl }, cap ? t('uplink.capSaved', { n: cap }) : t('uplink.capNone'))) editing = null
   }
 
   async function resetUsage() {
-    if (await set({ reset_usage: true }, 'licznik wyzerowany')) editing = null
+    if (await set({ reset_usage: true }, t('uplink.resetDone'))) editing = null
   }
 
   async function forget() {
     asking = false
     try {
       await api.forgetUplink(u.id)
-      notify(`${u.name} usunięte z listy`)
+      notify(t('uplink.forgotten', { name: u.name }))
     } catch (e) {
       notify(errorText(e), true)
     }
@@ -125,7 +109,7 @@
   const capText = $derived(
     u.limits.cap_mb
       ? `${megabytes(u.used_mb)} / ${megabytes(u.limits.cap_mb)} ${
-          { session: 'od startu', day: 'dziś', month: 'w miesiącu' }[u.limits.cap_period] ?? ''
+          periods.includes(u.limits.cap_period) ? t('uplink.capWhen.' + u.limits.cap_period) : ''
         }`
       : '',
   )
@@ -133,64 +117,64 @@
 
 <tr class:away={u.state !== 'up'}>
   <td>
-    <label class="switch" title={u.enabled ? 'Wyłącz to łącze' : 'Włącz to łącze'}>
+    <label class="switch" title={u.enabled ? t('uplink.turnOff') : t('uplink.turnOn')}>
       <input type="checkbox" checked={u.enabled}
-        onchange={(e) => set({ enabled: e.currentTarget.checked }, e.currentTarget.checked ? 'włączone' : 'wyłączone', e.currentTarget, u.enabled)} />
-      <span>{u.enabled ? 'wł.' : 'wył.'}</span>
+        onchange={(e) => set({ enabled: e.currentTarget.checked }, e.currentTarget.checked ? t('uplink.enabled') : t('uplink.disabled'), e.currentTarget, u.enabled)} />
+      <span>{u.enabled ? t('dir.on') : t('dir.off')}</span>
     </label>
   </td>
   <td>
     <div class="name">
-      <span class="icon" title={kinds[u.kind]?.[1] ?? u.kind}>{kinds[u.kind]?.[0] ?? '?'}</span>
+      <span class="icon" title={kindName(u.kind)}>{icons[u.kind] ?? '?'}</span>
       {#if renaming}
         <!-- svelte-ignore a11y_autofocus -->
         <input class="rename" value={u.name} autofocus onblur={rename} onkeydown={(e) => e.key === 'Enter' && e.currentTarget.blur()} />
       {:else}
-        <button class="link" title="Zmień nazwę" onclick={() => (renaming = true)}>{u.name}</button>
+        <button class="link" title={t('uplink.rename')} onclick={() => (renaming = true)}>{u.name}</button>
       {/if}
     </div>
     <div class="muted small">
-      {kinds[u.kind]?.[1] ?? u.kind} · {u.iface}
+      {kindName(u.kind)} · {u.iface}
       {#if u.tech}· {u.tech}{/if}
       {#if u.operator}· {u.operator}{/if}
-      {#if u.signal_dbm}· {u.signal_dbm} dBm{:else if u.quality}· sygnał {u.quality}%{/if}
+      {#if u.signal_dbm}· {u.signal_dbm} dBm{:else if u.quality}· {t('uplink.quality', { n: u.quality })}{/if}
     </div>
   </td>
   <td class="state">
     {#if u.state === 'up'}
-      <span class="dot ok"></span>{pathState[u.path_state] ?? 'połączone'}
+      <span class="dot ok"></span>{pathStates.includes(u.path_state) ? t('uplink.path.' + u.path_state) : t('uplink.connected')}
       {#if u.transport && u.transport !== 'udp'}<span class="chip warn">{u.transport.toUpperCase()}</span>{/if}
-      {#if u.direct_flows}<span class="muted small"> · {u.direct_flows} poł. bezpośr.</span>{/if}
+      {#if u.direct_flows}<span class="muted small"> · {t('relay.directFlows', { n: u.direct_flows })}</span>{/if}
     {:else if u.state === 'connecting'}
-      <span class="dot"></span>łączenie z serwerem…
+      <span class="dot"></span>{t('uplink.connecting')}
     {:else if u.state === 'limit'}
-      <span class="dot bad"></span>wyłączone
-      <div class="chip bad" title="Łącze wróci w nowym okresie albo po wyzerowaniu licznika (Limit…)">
-        Limit danych osiągnięty
+      <span class="dot bad"></span>{t('uplink.disabled')}
+      <div class="chip bad" title={t('uplink.cappedHint')}>
+        {t('relay.capped')}
       </div>
     {:else if u.state === 'captive'}
-      <span class="dot bad"></span>Wymaga logowania
+      <span class="dot bad"></span>{t('uplink.captive')}
       <div>
         <button class="small" onclick={login} disabled={loggingIn}
-          title="Otwiera stronę logowania tej sieci (hotel, pociąg) w przeglądarce">
-          {loggingIn ? 'Sprawdzam…' : 'Zaloguj'}
+          title={t('uplink.loginHint')}>
+          {loggingIn ? t('uplink.checking') : t('uplink.login')}
         </button>
       </div>
     {:else if u.state === 'absent'}
-      <span class="dot"></span>odłączone
+      <span class="dot"></span>{t('uplink.absent')}
     {:else}
-      <span class="dot"></span>wyłączone
+      <span class="dot"></span>{t('uplink.disabled')}
     {/if}
     {#if u.same_ip_as}
-      <div class="chip warn" title="To łącze ma ten sam publiczny adres IP co „{u.same_ip_as}” — to samo połączenie, bez zysku.">
-        {u.kind === 'usb' ? 'Wyłącz Wi-Fi w telefonie' : 'To samo łącze co ' + u.same_ip_as}
+      <div class="chip warn" title={t('uplink.sameIpHint', { name: u.same_ip_as })}>
+        {u.kind === 'usb' ? t('uplink.sameIpUsb') : t('uplink.sameIp', { name: u.same_ip_as })}
       </div>
     {/if}
     {#if u.no_internet && u.state !== 'captive'}
-      <div class="chip warn" title="Sprawdzenie strony logowania nie dostało odpowiedzi przez to łącze">Brak internetu</div>
+      <div class="chip warn" title={t('uplink.noInternetHint')}>{t('uplink.noInternet')}</div>
     {/if}
     {#if u.weak_cell}
-      <div class="chip warn" title="Słaby sygnał modemu lub duże straty. Przenieś laptopa bliżej okna.">Słaby zasięg modemu</div>
+      <div class="chip warn" title={t('uplink.weakCellHint')}>{t('uplink.weakCell')}</div>
     {/if}
   </td>
   <td class="num">
@@ -200,67 +184,66 @@
   </td>
   <td class="num">
     {#if u.has_path}
-      {ms(u.rtt_ms)}<br /><span class:lossy={u.loss_pct > 5}>{u.loss_pct.toFixed(1)}%</span>
+      {ms(u.rtt_ms)}<br /><span class:lossy={u.loss_pct > 5}>{num(u.loss_pct, 1)}%</span>
     {:else}—{/if}
   </td>
   <td class="num">
     {megabytes(u.used_mb)}
-    {#if capText}<div class="muted small">limit: {capText}</div>{/if}
+    {#if capText}<div class="muted small">{t('uplink.capText', { text: capText })}</div>{/if}
   </td>
   <td>
-    <select value={u.priority} onchange={(e) => set({ priority: e.currentTarget.value }, 'priorytet zmieniony', e.currentTarget, u.priority)}>
-      {#each priorities as [v, label]}<option value={v}>{label}</option>{/each}
+    <select value={u.priority} onchange={(e) => set({ priority: e.currentTarget.value }, t('relay.prioChanged'), e.currentTarget, u.priority)}>
+      {#each priorities as v}<option value={v}>{t('prio.' + v)}</option>{/each}
     </select>
   </td>
   <td>
-    <select value={u.up} onchange={(e) => set({ up: e.currentTarget.value }, 'wysyłanie zmienione', e.currentTarget, u.up)}>
-      {#each directions as [v, label]}<option value={v}>{label}</option>{/each}
+    <select value={u.up} onchange={(e) => set({ up: e.currentTarget.value }, t('relay.upChanged'), e.currentTarget, u.up)}>
+      {#each directions as v}<option value={v}>{t('dir.' + v)}</option>{/each}
     </select>
   </td>
   <td>
-    <select value={u.down} onchange={(e) => set({ down: e.currentTarget.value }, 'pobieranie zmienione', e.currentTarget, u.down)}>
-      {#each directions as [v, label]}<option value={v}>{label}</option>{/each}
+    <select value={u.down} onchange={(e) => set({ down: e.currentTarget.value }, t('relay.downChanged'), e.currentTarget, u.down)}>
+      {#each directions as v}<option value={v}>{t('dir.' + v)}</option>{/each}
     </select>
   </td>
   <td>
-    <input type="number" min="0" placeholder="bez" value={u.rate_kbps || ''} onchange={setRate} />
+    <input type="number" min="0" placeholder={t('relay.none')} value={u.rate_kbps || ''} onchange={setRate} />
   </td>
   <td class="actions">
-    <button onclick={openLimits}>Limit…</button>
-    <button class="danger" onclick={() => (asking = true)}>Usuń</button>
+    <button onclick={openLimits}>{t('uplink.limitButton')}</button>
+    <button class="danger" onclick={() => (asking = true)}>{t('common.delete')}</button>
     {#if editing}
-      <ConfirmDialog title="Limity łącza „{u.name}”" yes="Zapisz" no="Anuluj" onyes={saveLimits} onno={() => (editing = null)}>
+      <ConfirmDialog title={t('uplink.limitsTitle', { name: u.name })} yes={t('common.save')} no={t('common.cancel')} onyes={saveLimits} onno={() => (editing = null)}>
         <div class="form">
-          <label>Limit danych <input type="number" min="0" placeholder="bez" bind:value={editing.cap} /> MB</label>
+          <label>{t('uplink.cap')} <input type="number" min="0" placeholder={t('relay.none')} bind:value={editing.cap} /> MB</label>
           <label>
-            Okres
+            {t('uplink.period')}
             <select bind:value={editing.period}>
-              {#each periods as [v, label]}<option value={v}>{label}</option>{/each}
+              {#each periods as v}<option value={v}>{t('uplink.period.' + v)}</option>{/each}
             </select>
           </label>
           {#if editing.period === 'month'}
-            <label>Dzień odnowienia <input type="number" min="1" max="28" bind:value={editing.resetDay} /></label>
+            <label>{t('uplink.resetDay')} <input type="number" min="1" max="28" bind:value={editing.resetDay} /></label>
           {/if}
           <label class="check">
             <input type="checkbox" bind:checked={editing.throttle} />
-            Po przekroczeniu zwolnij do 256 kb/s zamiast wyłączać
+            {t('uplink.throttle')}
           </label>
-          <label class="check" title="Operatorzy wykrywają udostępnianie internetu po TTL; 65 ukrywa laptopa za telefonem">
+          <label class="check" title={t('uplink.ttlHint')}>
             <input type="checkbox" bind:checked={editing.ttl} />
-            Ustaw TTL 65 (ukryj udostępnianie przed operatorem)
+            {t('uplink.ttl')}
           </label>
           <p class="muted small">
-            Zużyte w tym okresie: {megabytes(u.used_mb)}
-            <button class="link" onclick={resetUsage}>Wyzeruj licznik</button>
+            {t('uplink.usedPeriod', { mb: megabytes(u.used_mb) })}
+            <button class="link" onclick={resetUsage}>{t('uplink.reset')}</button>
           </p>
         </div>
       </ConfirmDialog>
     {/if}
     {#if asking}
-      <ConfirmDialog title="Usunąć łącze „{u.name}” z listy?" yes="Tak, usuń" no="Nie" danger onyes={forget}
+      <ConfirmDialog title={t('uplink.forgetAsk', { name: u.name })} yes={t('common.deleteYes')} no={t('common.no')} danger onyes={forget}
         onno={() => (asking = false)}>
-        <p>Hub przestanie go używać i zapomni jego ustawienia oraz licznik. Jeśli łącze jest podłączone,
-          pojawi się znowu jako nowe, wyłączone.</p>
+        <p>{t('uplink.forgetBody')}</p>
       </ConfirmDialog>
     {/if}
   </td>

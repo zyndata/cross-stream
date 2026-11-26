@@ -1,54 +1,49 @@
-// Formatting helpers (Polish UI).
+// Formatting helpers; text and number format follow the active language.
+import { t, tn, num } from '../i18n/i18n.svelte.js'
 
 export function mbps(v) {
   if (!v) return '0'
-  if (v < 0.1) return (v * 1000).toFixed(0) + ' kb/s'
-  return (v < 10 ? v.toFixed(2) : v.toFixed(1)) + ' Mb/s'
+  if (v < 0.1) return num(v * 1000) + ' kb/s'
+  return num(v, v < 10 ? 2 : 1) + ' Mb/s'
 }
 
 export function megabytes(mb) {
   if (!mb) return '0 MB'
-  if (mb >= 1000) return (mb / 1000).toFixed(2) + ' GB'
-  return mb.toFixed(mb < 10 ? 1 : 0) + ' MB'
+  if (mb >= 1000) return num(mb / 1000, 2) + ' GB'
+  return num(mb, mb < 10 ? 1 : 0) + ' MB'
 }
 
 export function ms(v) {
-  return v.toFixed(0) + ' ms'
+  return num(v) + ' ms'
 }
 
-export const modeLabel = {
-  BONDED: 'Połączono (bonding)',
-  DIRECT: 'Tryb bezpośredni',
-  CONNECTING: 'Łączenie',
-  OFFLINE: 'Offline',
+// modeLabel names a hub mode (BONDED, DIRECT, CONNECTING, OFFLINE).
+export function modeLabel(m) {
+  const k = 'mode.' + String(m).toLowerCase()
+  const s = t(k)
+  return s === k ? m : s
 }
 
 export const netLabel = { nr: '5G', lte: 'LTE', wcdma: '3G', gsm: '2G' }
 
-const reasonLabel = {
-  limit: 'limit danych',
-  battery: 'niski poziom baterii',
-  no_data: 'brak danych komórkowych',
-  no_cellular: 'brak sieci komórkowej',
-  user: 'wyłączony w telefonie',
-}
+const reasons = ['limit', 'battery', 'no_data', 'no_cellular', 'user']
 
 // lastReason translates "leaving: limit" style daemon reasons.
 export function lastReason(r) {
   if (!r) return ''
   if (r.startsWith('leaving: ')) {
     const k = r.slice(9)
-    return reasonLabel[k] ?? k
+    return reasons.includes(k) ? t('reason.' + k) : k
   }
-  return 'utracono połączenie'
+  return t('reason.lost')
 }
 
-export function ago(t) {
-  if (!t) return ''
-  const s = Math.max(0, (Date.now() - new Date(t).getTime()) / 1000)
-  if (s < 60) return Math.round(s) + ' s temu'
-  if (s < 3600) return Math.round(s / 60) + ' min temu'
-  return Math.round(s / 3600) + ' h temu'
+export function ago(time) {
+  if (!time) return ''
+  const s = Math.max(0, (Date.now() - new Date(time).getTime()) / 1000)
+  if (s < 60) return t('ago.s', { n: Math.round(s) })
+  if (s < 3600) return t('ago.min', { n: Math.round(s / 60) })
+  return t('ago.h', { n: Math.round(s / 3600) })
 }
 
 // pathHint says what enrollment goes through: a connected phone or an
@@ -56,9 +51,5 @@ export function ago(t) {
 export function pathHint(view) {
   const phones = (view.relays ?? []).filter((r) => r.connected).length
   const links = (view.uplinks ?? []).filter((u) => u.enabled).length
-  const now = `Teraz: ${phones} ${phones === 1 ? 'telefon' : 'telefony'} połączone, ${links} ${links === 1 ? 'łącze lokalne włączone' : 'łącza lokalne włączone'}.`
-  return (
-    'Rejestracja idzie przez połączony telefon albo włączone łącze lokalne huba (zakładka Panel); ' +
-    'gdy nie ma żadnego — przez połączenie internetowe tego komputera. ' + now
-  )
+  return t('enroll.pathHint', { phones: tn('enroll.pathPhones', phones), links: tn('enroll.pathLinks', links) })
 }

@@ -61,7 +61,7 @@ func TestSetVerboseLogs(t *testing.T) {
 		return lvl.Set(p.Level, time.Duration(p.ForSecs)*time.Second)
 	}, slog.New(slog.DiscardHandler))
 
-	a := &App{sock: sock, log: slog.New(slog.DiscardHandler)}
+	a := &App{tr: testTexts(langPL), sock: sock, log: slog.New(slog.DiscardHandler)}
 	tests := []struct {
 		on    bool
 		want  string

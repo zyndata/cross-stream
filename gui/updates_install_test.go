@@ -66,7 +66,7 @@ func installUpdaterServing(t *testing.T, sums func(name, sum string) string, ser
 			t.Fatal(err)
 		}
 	}
-	u := newUpdater("v1.0.0")
+	u := newUpdater("v1.0.0", testTexts(langPL))
 	u.client = &update.Client{HTTP: srv.Client(), LatestURL: srv.URL + "/latest", Prefix: srv.URL + "/dl/"}
 	u.path = filepath.Join(t.TempDir(), updateFile)
 	u.prefs = updatePrefs{}

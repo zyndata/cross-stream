@@ -1,4 +1,6 @@
 <script>
+  import { t } from '../i18n/i18n.svelte.js'
+
   let { toast } = $props()
   let shown = $state(null)
   let timer
@@ -14,7 +16,7 @@
 {#if shown}
   <div class="toast" class:bad={shown.bad} role="status">
     {shown.text}
-    <button aria-label="Zamknij" onclick={() => (shown = null)}>×</button>
+    <button aria-label={t('common.close')} onclick={() => (shown = null)}>×</button>
   </div>
 {/if}
 

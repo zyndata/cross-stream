@@ -28,15 +28,15 @@ func (a *App) ExportLogs() (string, error) {
 	ctx := a.ctx
 	a.mu.Unlock()
 	path, err := runtime.SaveFileDialog(ctx, runtime.SaveDialogOptions{
-		Title:           "Zapisz logi huba",
+		Title:           a.tr.T("go.logs.title", nil),
 		DefaultFilename: "crossstream-hub-log-" + time.Now().Format("20060102-1504") + ".txt",
-		Filters:         []runtime.FileFilter{{DisplayName: "Tekst (*.txt)", Pattern: "*.txt"}},
+		Filters:         []runtime.FileFilter{{DisplayName: a.tr.T("go.logs.filter", nil), Pattern: "*.txt"}},
 	})
 	if err != nil || path == "" {
 		return "", err
 	}
 	if err := os.WriteFile(path, []byte(logText(res)), 0o600); err != nil {
-		return "", fmt.Errorf("zapis: %w", err)
+		return "", fmt.Errorf("save logs: %w", err)
 	}
 	return path, nil
 }
@@ -50,7 +50,7 @@ func logText(r logsExport) string {
 // methodLogsLevel is xs-hubd's run-time log level (internal/hub/rpc_ext.go, phase 19).
 const methodLogsLevel = "logs.level"
 
-// verboseFor is how long the GUI switch "Szczegółowe logi" keeps debug on.
+// verboseFor is how long the GUI switch "Detailed logs" keeps debug on.
 const verboseFor = 15 * time.Minute
 
 // logLevel is hublog.LevelState.

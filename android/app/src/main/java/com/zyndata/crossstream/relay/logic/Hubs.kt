@@ -20,10 +20,16 @@ data class SavedHub(
     val use: HubUse = HubUse.NORMAL,
     /** The friend chose this hub: joined whenever it is available (at most one). */
     val preferred: Boolean = false,
+    /** The friend's own name for this hub ("" = the hub's name from its code). */
+    val label: String = "",
 ) {
+    /** The name the app shows: the friend's label, else the hub's own name. */
+    val shownName: String get() = label.ifBlank { name }
+
     fun toJson(): JSONObject = JSONObject()
         .put("id", id).put("name", name).put("ssid", ssid).put("bssid", bssid).put("qr", qr)
         .put("last_seen", lastSeen).put("shared", sharedBytes).put("use", use.wire).put("preferred", preferred)
+        .put("label", label)
 
     companion object {
         fun fromJson(o: JSONObject) = SavedHub(
@@ -36,7 +42,14 @@ data class SavedHub(
             sharedBytes = o.optLong("shared"),
             use = HubUse.of(o.optString("use")),
             preferred = o.optBoolean("preferred"),
+            label = o.optString("label"),
         )
+
+        /** Longest label the friend can give a hub. */
+        const val LABEL_MAX = 32
+
+        /** A label as saved: trimmed, at most LABEL_MAX characters ("" = the hub's own name). */
+        fun cleanLabel(s: String): String = s.trim().take(LABEL_MAX).trim()
 
         fun listToJson(hubs: List<SavedHub>): String = JSONArray(hubs.map { it.toJson() }).toString()
 
@@ -96,6 +109,24 @@ object HubPicker {
         val chosen = hubs.firstOrNull { it.preferred } ?: return false
         return chosen.id != current && (cooldownUntil[chosen.id] ?: 0) <= nowMs &&
             (scan == null || scan.any { matches(chosen, it) })
+    }
+
+    /**
+     * The scan a running session judges the chosen hub by: newer results replace it, but an
+     * empty list (no scan permission in the background) is "unknown", not "nothing in range",
+     * so it keeps the last real scan (the session kept the scan of its start, so a chosen hub
+     * that came into range later was never joined, 2026-11-26).
+     */
+    fun sessionScan(known: List<SeenAp>?, fresh: List<SeenAp>?): List<SeenAp>? =
+        fresh?.takeIf { it.isNotEmpty() } ?: known
+
+    /**
+     * The chosen hub the friend can switch to by hand ("Switch now"): the relay shares with
+     * another hub; null when nothing is chosen or the session is already with the chosen hub.
+     */
+    fun switchOffer(hubs: List<SavedHub>, current: String, inSession: Boolean): SavedHub? {
+        if (!inSession || current.isEmpty()) return null
+        return hubs.firstOrNull { it.preferred }?.takeIf { it.id != current }
     }
 
     /** Results older than the newest by more than this are from earlier scans. */

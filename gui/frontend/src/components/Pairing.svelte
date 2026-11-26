@@ -4,6 +4,7 @@
   import { onMount } from 'svelte'
   import { api, errorText } from '../lib/api.js'
   import { portal } from '../lib/portal.js'
+  import { t } from '../i18n/i18n.svelte.js'
 
   let { notify } = $props()
   let qr = $state(null)
@@ -40,7 +41,7 @@
   async function copy() {
     try {
       await navigator.clipboard.writeText(qr.code)
-      notify('Kod skopiowany')
+      notify(t('pair.copied'))
     } catch {
       showCode = true
     }
@@ -48,30 +49,29 @@
 </script>
 
 <div class="card pair">
-  <h2>Dodaj telefon</h2>
+  <h2>{t('pair.title')}</h2>
   {#if qr}
-    <button class="qr" onclick={() => (zoom = true)} title="Powiększ kod">
-      <img src="data:image/png;base64,{qr.png}" alt="Kod QR parowania" />
+    <button class="qr" onclick={() => (zoom = true)} title={t('pair.zoom')}>
+      <img src="data:image/png;base64,{qr.png}" alt={t('pair.alt')} />
     </button>
     <p class="muted small">
-      Zeskanuj w aplikacji CrossStream Relay („+ Dodaj hub”). Kod jednorazowy, ważny jeszcze
-      {Math.floor(left / 60)}:{String(left % 60).padStart(2, '0')}.
+      {t('pair.hint', { left: Math.floor(left / 60) + ':' + String(left % 60).padStart(2, '0') })}
     </p>
     <div class="row">
-      <button onclick={load}>Odśwież</button>
-      <button onclick={copy}>Kopiuj kod</button>
+      <button onclick={load}>{t('common.refresh')}</button>
+      <button onclick={copy}>{t('pair.copy')}</button>
     </div>
     {#if showCode}<textarea readonly rows="3">{qr.code}</textarea>{/if}
     {#if zoom}
       <div class="zoom" use:portal role="presentation" onclick={() => (zoom = false)}>
-        <img src="data:image/png;base64,{qr.png}" alt="Kod QR parowania, powiększony" />
-        <p>Kliknij albo naciśnij Esc, aby zamknąć</p>
+        <img src="data:image/png;base64,{qr.png}" alt={t('pair.altZoom')} />
+        <p>{t('pair.zoomClose')}</p>
       </div>
     {/if}
   {:else if err}
     <p class="muted">{err}</p>
   {:else}
-    <p class="muted">Ładowanie…</p>
+    <p class="muted">{t('common.loading')}</p>
   {/if}
 </div>
 

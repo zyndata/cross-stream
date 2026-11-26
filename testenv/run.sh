@@ -3,7 +3,7 @@
 #   ./run.sh <scenario>... | all | short
 #   scenarios: ping download forget iperf failover rejoin backup secondary limits loss mixed
 #              latency fallback udpblock redundant speedtest aggregation bypass portfwd prio-cap localpath pep webui
-#              capdrop update sleep captive tcploss
+#              capdrop update sleep captive tcploss owntraffic
 # short = ping failover limits (~6 min); CI runs it when the commit message has "[e2e short]".
 # On demand only (not in "all"): tcpconns (phase 19 G spike, ~15 min).
 # Each scenario starts a fresh environment ("all" runs them one after another).
@@ -34,7 +34,7 @@ ORIGIN3=172.30.0.42
 IPERF=172.30.0.30
 NET_HOST=192.0.2.31 # "internet" address outside the Docker subnets (portfwd)
 OUT=out
-SCENARIOS="ping download forget iperf failover rejoin backup secondary limits loss mixed latency fallback udpblock redundant speedtest aggregation bypass portfwd prio-cap localpath pep webui capdrop update sleep captive tcploss"
+SCENARIOS="ping download forget iperf failover rejoin backup secondary limits loss mixed latency fallback udpblock redundant speedtest aggregation bypass portfwd prio-cap localpath pep webui capdrop update sleep captive tcploss owntraffic"
 ON_DEMAND="tcpconns"
 LAT_MODE=${LAT_MODE:-min_latency}
 SHORT="ping failover limits" # ~6 min: tunnel, bonding failover, per-path limits
@@ -788,6 +788,68 @@ sc_bypass() {
 	pass "bypass: canary forwarded with an empty list, NXDOMAIN with bypass.test; bypass.test -> $ip left via carrier $peer, tunnel.test -> $ip2 via the server $peer2 (learned $learned)"
 }
 
+# hub_peer <tag> [curl args]: curl from the hub itself (its own traffic),
+# then the address the origin saw for it ("" = the request failed).
+hub_peer() {
+	tag=$1
+	shift
+	x hub curl -s -o /dev/null --max-time 10 "$@" "http://$ORIGIN/$tag" || { echo ""; return; }
+	origin_peer "$tag"
+}
+own_rules() { x hub ip rule show | grep -c -E "^(99|10[12]):" | tr -d '\r'; }
+# hub_uplink: the hub's own uplink (device of its main default route).
+hub_uplink() { x hub ip -4 route show default | awk '{ for (i = 1; i < NF; i++) if ($i == "dev") { print $(i + 1); exit } }' | tr -d '\r'; }
+
+# sc_owntraffic (phase 21): with own traffic on, the hub's own requests leave
+# through the server in BONDED and through a relay's carrier in DIRECT; off
+# (and with no path, the fallback) they use the hub's own uplink (carrier4,
+# 172.30.0.14) and no own-traffic rule or IPv6 table is left.
+sc_owntraffic() {
+	p=$(hub_peer "own0$$")
+	[ "$p" = 172.30.0.14 ] || fail "owntraffic: off: the origin saw '$p' for the hub, want its own uplink 172.30.0.14"
+	x hub xs-hubctl settings -own-traffic on >/dev/null || fail "owntraffic: xs-hubctl settings -own-traffic on"
+	[ "$(hubq .own_traffic)" = true ] || fail "owntraffic: status own_traffic not true"
+	on() { [ "$(own_rules)" -ge 3 ]; } # 101, 102 and one bound rule (99) per uplink
+	wait_for 10 on || fail "owntraffic: own-traffic rules not installed ($(x hub ip rule show | tr '\n' ';'))"
+	x hub nft list table ip6 crossstream_hub >/dev/null 2>&1 || fail "owntraffic: IPv6 reject table missing"
+	p=$(hub_peer "own1$$")
+	[ "$p" = 172.30.0.2 ] || fail "owntraffic: BONDED: the origin saw '$p' for the hub, want the server 172.30.0.2"
+	tip=$(hubq .tunnel_ip)
+	a=$(x hub nslookup tunnel.test "$tip" 2>/dev/null | awk '/^Address/ { a = $NF } END { print a }' | tr -d '\r')
+	[ "$a" = "$ORIGIN3" ] || fail "owntraffic: hub DNS on the tunnel address $tip answered '$a' for tunnel.test, want $ORIGIN3"
+	pass "owntraffic: on, BONDED: the hub's own request left via the server ($p); hub DNS answers on $tip; IPv6 reject table present"
+	# A socket bound to the uplink (NetworkManager's connectivity check) keeps it.
+	up=$(hub_uplink)
+	x hub ip rule show | grep -q -E "^99:.*oif $up lookup main" || fail "owntraffic: no bound rule for the uplink '$up'"
+	p=$(hub_peer "own1b$$" --interface "$up")
+	[ "$p" = 172.30.0.14 ] || fail "owntraffic: curl --interface $up: the origin saw '$p', want the hub's own uplink 172.30.0.14"
+	pass "owntraffic: on: a socket bound to $up leaves through it ($p), as NetworkManager's check needs"
+
+	dc stop -t 2 server >"$OUT/server-stop.log" 2>&1 || fail "owntraffic: docker compose stop server"
+	wait_for 30 mode_is DIRECT || fail "owntraffic: no DIRECT 30 s after the server stopped (mode $(hubq .mode))"
+	p=$(hub_peer "own2$$")
+	case "$p" in 172.30.0.11 | 172.30.0.12 | 172.30.0.13) ;;
+	*) fail "owntraffic: DIRECT: the origin saw '$p' for the hub, want a relay carrier (172.30.0.11-13)" ;;
+	esac
+	pass "owntraffic: on, DIRECT: the hub's own request left via relay carrier $p"
+
+	for n in 1 2 3; do kill_relay "$n"; done
+	offline() { mode_is OFFLINE; }
+	wait_for 30 offline || fail "owntraffic: not OFFLINE after the relays stopped (mode $(hubq .mode))"
+	gone() { [ "$(own_rules)" = 0 ]; }
+	wait_for 10 gone || fail "owntraffic: OFFLINE: own-traffic rules still there (fallback wanted)"
+	p=$(hub_peer "own3$$")
+	[ "$p" = 172.30.0.14 ] || fail "owntraffic: OFFLINE: the origin saw '$p', want the hub's own uplink 172.30.0.14 (fallback)"
+	pass "owntraffic: on, OFFLINE: rules removed, the hub's own request used its own uplink (fallback)"
+
+	x hub xs-hubctl settings -own-traffic off >/dev/null || fail "owntraffic: xs-hubctl settings -own-traffic off"
+	[ "$(own_rules)" = 0 ] || fail "owntraffic: off: own-traffic rules left"
+	x hub nft list table ip6 crossstream_hub >/dev/null 2>&1 && fail "owntraffic: off: IPv6 reject table left"
+	r=$(x hub ip route get "$ORIGIN" | tr -d '\r')
+	case "$r" in *xs0*) fail "owntraffic: off: the hub routes $ORIGIN through xs0 ($r)" ;; esac
+	pass "owntraffic: off: no own-traffic rule, no IPv6 table, $ORIGIN not routed through xs0"
+}
+
 # fq <jq filter>: query xs-hubctl forwards inside the hub.
 fq() { dc exec -T -e F="$1" hub sh -c 'xs-hubctl forwards | jq -r "$F"' | tr -d '\r'; }
 
@@ -913,7 +975,8 @@ sc_captive() {
 # dropped on carrier1), netem TCPL_RATE (20 Mb/s) 60±10 ms. TCPL_MB download
 # with one TCP connection (relay override -tcp-conns 1) and with the hub's
 # choice (2, or 4 on heavy loss) at 0 % and 2 % loss. Bars: 2 % loss ≥ 1.3×
-# one connection; 0 % loss ≥ 0.85× (no regression, one run per cell).
+# one connection; 0 % loss ≥ 0.85× (no regression); each cell is the median
+# of three downloads (one run per cell was flaky: 0.95-1.9×).
 sc_tcploss() {
 	[ "$NETEM" = 0 ] && fail "tcploss: needs netem"
 	kill_relay 2
@@ -935,9 +998,15 @@ sc_tcploss() {
 		for l in 0 2; do
 			netem_set 1 rate "$rate" delay 60ms 10ms loss "$l%"
 			sleep 2
-			dl "${TCPL_MB:-20}"
-			eval "M_${mode}_$l=\$DL_MBPS"
-			echo "      tcploss $mode loss=$l%: ${DL_MBPS} Mb/s, $(conns_now) tcp connections"
+			runs=""
+			for _ in 1 2 3; do
+				dl "${TCPL_MB:-20}"
+				runs="$runs $DL_MBPS"
+			done
+			# median of three: one connection at 2 % loss alone ranged 8-12 Mb/s
+			med=$(printf '%s\n' $runs | sort -n | sed -n 2p)
+			eval "M_${mode}_$l=\$med"
+			echo "      tcploss $mode loss=$l%: median $med Mb/s of$runs, $(conns_now) tcp connections"
 		done
 	done
 	ratio_ok "$M_hub_2" "$M_one_2" 1.3 || fail "tcploss: 2 % loss ${M_hub_2} Mb/s with the hub's choice vs ${M_one_2} with one connection (< 1.3×)"
@@ -1046,6 +1115,16 @@ sc_webui() {
 	echo "$hdr" | grep -qi "unsafe-" && fail "webui: CSP allows unsafe-*"
 	x server grep -q 'src="./assets/' /tmp/index.html || fail "webui: index.html is not the built panel with relative URLs (node stage)"
 	x server grep -qiE '<script>|<style|style=' /tmp/index.html && fail "webui: inline script or style in index.html"
+	# Phase 22: the built bundle carries both languages and the switch (no browser here: the
+	# English rendering itself is checked by hand); its CSP header is the page's.
+	js=$(x server sed -n 's|.*src="\./\(assets/[^"]*\.js\)".*|\1|p' /tmp/index.html | head -n 1 | tr -d '\r')
+	[ -n "$js" ] || fail "webui: no script in index.html"
+	jshdr=$(x server curl -sk --max-time 10 -D - -o /tmp/panel.js "$WEB/$js" | tr -d '\r')
+	[ "$(echo "$jshdr" | grep -i '^content-security-policy:')" = "$(echo "$hdr" | grep -i '^content-security-policy:')" ] ||
+		fail "webui: CSP header of $js differs from the page's"
+	for s in 'Server panel' 'Panel serwera' 'Log out' 'xs-lang'; do
+		x server grep -qF "$s" /tmp/panel.js || fail "webui: panel bundle lacks '$s' (English/Polish dictionaries, language switch)"
+	done
 	r=$(wget_ hubs)
 	[ "$(code_of "$r")" = 401 ] || fail "webui: /api/hubs without login gave $(code_of "$r"), want 401"
 	login=$(x server curl -sk --max-time 10 -D /tmp/lh -c /tmp/wc -H 'Content-Type: application/json' \

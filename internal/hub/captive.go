@@ -25,9 +25,10 @@ const (
 	CaptiveGiveUp    = 10 * time.Minute
 	CaptiveFailAfter = 15 * time.Second
 	PortalRouteFor   = 10 * time.Minute
-	// CaptiveHint is shown when the login page cannot be opened through
-	// the uplink from the laptop (user-facing, Polish).
-	CaptiveHint = "Zaloguj się w tej sieci na telefonie lub wyłącz hub na chwilę"
+	// CaptiveHint is shown (xs-hubctl, English like every terminal tool) when
+	// the login page cannot be opened through the uplink from the laptop; the
+	// GUI says the same in its own language.
+	CaptiveHint = "Log in to this network on a phone or turn the hub off for a moment"
 )
 
 // captiveInfo is the last probe of one link (guarded by Daemon.upMu).

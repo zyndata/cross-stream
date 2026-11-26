@@ -142,6 +142,52 @@ func TestHotspotClientWifi(t *testing.T) {
 	}
 }
 
+// TestHotspotDisconnectRestore: the Wi-Fi network a disconnect took the
+// card from is connected again by Down, once; a share disconnects nothing
+// and Down reconnects nothing.
+func TestHotspotDisconnectRestore(t *testing.T) {
+	ctx := context.Background()
+	tests := []struct {
+		name   string
+		choice string
+		want   int // "connection up id Office" after Down
+	}{
+		{"disconnect", ClientWifiDisconnect, 1},
+		{"share", ClientWifiShare, 0},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			f := &fakeNM{devices: "wlan9:wifi:connected:Office\n"}
+			h := newTestHotspot(t, f)
+			twoClients(t, f)
+			c := testHotspotConfig()
+			c.ClientWifi = tc.choice
+			if _, err := h.Up(ctx, c); err != nil {
+				t.Fatal(err)
+			}
+			if tc.choice == ClientWifiDisconnect {
+				f.devices = "wlan9:wifi:disconnected:\n"
+				if _, err := h.Up(ctx, c); err != nil { // a restart with the card free keeps the network to restore
+					t.Fatal(err)
+				}
+			}
+			const up = "nmcli --wait 15 connection up id Office"
+			if strings.Contains(strings.Join(f.cmds, "|"), up) {
+				t.Fatalf("reconnected before Down: %q", f.cmds)
+			}
+			if err := h.Down(ctx); err != nil {
+				t.Fatal(err)
+			}
+			if err := h.Down(ctx); err != nil {
+				t.Fatal(err)
+			}
+			if n := strings.Count(strings.Join(f.cmds, "|"), up); n != tc.want {
+				t.Fatalf("%d reconnects, want %d: %q", n, tc.want, f.cmds)
+			}
+		})
+	}
+}
+
 // twoClients makes the Intel test card allow two managed interfaces (a
 // card that can share; the real AX201 cannot).
 func twoClients(t *testing.T, f *fakeNM) {

@@ -1,7 +1,9 @@
 <script>
   // Total server throughput, last 5 minutes (one sample per second, bytes/s).
   // rx = hubs → server (upload), tx = server → hubs (download).
-  let { history = [], title = 'Przepustowość (5 min)' } = $props()
+  import { t, num } from '../i18n/i18n.svelte.js'
+
+  let { history = [], title = '' } = $props()
 
   const H = 230
   const L = 64
@@ -36,17 +38,17 @@
 
 <div class="card">
   <h2>
-    {title}
-    <span class="legend"><i class="up"></i>od hubów <i class="down"></i>do hubów</span>
+    {title || t('chart.title')}
+    <span class="legend"><i class="up"></i>{t('chart.fromHubs')} <i class="down"></i>{t('chart.toHubs')}</span>
   </h2>
   <div bind:clientWidth={width}>
-    <svg width={W} height={H} viewBox="0 0 {W} {H}" role="img" aria-label="Wykres przepustowości">
+    <svg width={W} height={H} viewBox="0 0 {W} {H}" role="img" aria-label={t('chart.label')}>
       {#each ticks as v}
         <line x1={L} x2={W - R} y1={y(v)} y2={y(v)} class="grid" />
-        <text x={L - 6} y={y(v) + 4} text-anchor="end">{v === 0 ? '0' : v < 1 ? v.toFixed(1) : v} Mb/s</text>
+        <text x={L - 6} y={y(v) + 4} text-anchor="end">{v === 0 ? '0' : num(v, v < 1 ? 1 : 0)} Mb/s</text>
       {/each}
       {#each [0, 1, 2, 3, 4, 5] as m}
-        <text x={x(end - SPAN + m * 60_000)} y={H - 3} text-anchor="middle">{m === 5 ? 'teraz' : `-${5 - m} min`}</text>
+        <text x={x(end - SPAN + m * 60_000)} y={H - 3} text-anchor="middle">{m === 5 ? t('chart.now') : `-${5 - m} min`}</text>
       {/each}
       {#if pts.length > 1}
         <polyline points={line('down')} class="down" />

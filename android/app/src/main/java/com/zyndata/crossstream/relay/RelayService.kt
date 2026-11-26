@@ -63,8 +63,12 @@ class RelayService : LifecycleService() {
 
     @Volatile private var settings = RelaySettings()
     @Volatile private var hubs = emptyList<SavedHub>()
-    /** The last search's scan (null = unknown): whether a chosen hub is in range. */
-    private var lastScan: List<SeenAp>? = null
+    /** The latest scan (null = unknown): whether a chosen hub is in range. */
+    @Volatile private var lastScan: List<SeenAp>? = null
+    /** "Switch now" pressed: the session leaves for the chosen hub. */
+    @Volatile private var switchNow = false
+    /** The next search joins the chosen hub without waiting for it in a scan. */
+    private var forceChosen = false
     @Volatile private var sessionStart = 0L
     @Volatile private var wifiHandle = 0L
     @Volatile private var wifiUnavailable = false
@@ -79,7 +83,23 @@ class RelayService : LifecycleService() {
         notes = RelayNotifications(this)
         networks = HubNetworks(this, networkListener)
         lifecycleScope.launch { app.repo.settings.collect { settings = it; pokes.trySend(Unit) } }
-        lifecycleScope.launch { app.repo.hubs.collect { hubs = it; pokes.trySend(Unit) } }
+        lifecycleScope.launch {
+            app.repo.hubs.collect { list ->
+                val chosenBefore = hubs.firstOrNull { it.preferred }?.id
+                hubs = list
+                // A new chosen hub during a session: one fresh scan (the friend's tap, no
+                // background work) tells whether it is in range, so the session can move to it.
+                val chosen = list.firstOrNull { it.preferred }?.id
+                if (chosen != null && chosen != chosenBefore && inSession()) probe.requestScan()
+                pokes.trySend(Unit)
+            }
+        }
+        lifecycleScope.launch {
+            RelayStateHolder.switchRequests.collect {
+                switchNow = true
+                pokes.trySend(Unit)
+            }
+        }
         lifecycleScope.launch { app.repo.sessionStart.collect { sessionStart = it } }
         lifecycleScope.launch { app.usage.flow.collect { pokes.trySend(Unit) } }
         lifecycleScope.launch { RelayStateHolder.wakeups.collect { if (searching()) pokes.trySend(Unit) } }
@@ -95,10 +115,14 @@ class RelayService : LifecycleService() {
         override fun onReceive(context: Context, intent: Intent) {
             scans.trySend(Unit)
             if (searching() && HubPicker.wakeFor(hubs, probe.scanResults(), cooldown, now())) pokes.trySend(Unit)
+            // During a session the results Android gets anyway keep the chosen-hub check current.
+            if (inSession()) lastScan = HubPicker.sessionScan(lastScan, probe.scanResults())
         }
     }
 
     private fun searching() = main != null && RelayStateHolder.flow.value.phase == Phase.SEARCHING
+
+    private fun inSession() = main != null && RelayStateHolder.flow.value.phase.let { it == Phase.CONNECTING || it == Phase.RELAYING }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         super.onStartCommand(intent, flags, startId)
@@ -209,6 +233,10 @@ class RelayService : LifecycleService() {
         val scan = probe.scanResults()?.takeIf { it.isNotEmpty() }
         lastScan = scan
         publish { it.copy(inRange = scan?.let { s -> HubPicker.inRange(list, s) }) }
+        if (forceChosen) { // "Switch now": try the chosen hub even when this scan missed it
+            forceChosen = false
+            list.firstOrNull { it.preferred }?.let { return it }
+        }
         HubPicker.pick(list, scan, cooldown, now())?.let { return it }
         if (attempt % 5 == 0) { // why nothing is joined (field logs), not on every scan
             val cooling = cooldown.filterValues { it > now() }.keys.mapNotNull { id -> list.firstOrNull { it.id == id }?.name }
@@ -293,6 +321,15 @@ class RelayService : LifecycleService() {
                     return Outcome.Paused(reason)
                 }
                 if (hubs.none { it.id == hub.id }) return stopAnd(c, Outcome.Again) // forgotten in the app
+                if (switchNow) {
+                    switchNow = false
+                    HubPicker.switchOffer(hubs, hub.id, inSession = true)?.let { chosen ->
+                        app.log.i(TAG, "leaving ${hub.name} for ${chosen.name} (switch now)")
+                        cooldown.remove(chosen.id)
+                        forceChosen = true
+                        return stopAnd(c, Outcome.Again)
+                    }
+                }
                 if (HubPicker.switchTo(hubs, hub.id, lastScan, cooldown, t)) { // the friend chose another hub
                     app.log.i(TAG, "leaving ${hub.name} for the chosen hub")
                     return stopAnd(c, Outcome.Again)
@@ -317,7 +354,7 @@ class RelayService : LifecycleService() {
                 connected = connected || st.connected
                 val phase = if (st.connected) Phase.RELAYING else Phase.CONNECTING
                 publish { it.copy(phase = phase, stats = st, sessionShared = it.sessionShared + delta) }
-                if (n++ % NOTIFY_EVERY == 0) notes.show(RelayStateHolder.flow.value, hub.name)
+                if (n++ % NOTIFY_EVERY == 0) notes.show(RelayStateHolder.flow.value, (hubs.firstOrNull { it.id == hub.id } ?: hub).shownName)
                 if (t - lastFlush >= FLUSH_MS) {
                     lastFlush = t
                     flush(hub.id, if (connected) hubBytes else -1).also { hubBytes = 0 }

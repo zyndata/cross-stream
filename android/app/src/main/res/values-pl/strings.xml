@@ -103,6 +103,12 @@
     <string name="hub_choose_auto">Wybieraj automatycznie</string>
     <string name="hub_chosen_text">Wybrany: telefon łączy się z tym hubem zawsze, gdy jest dostępny, także zamiast innego huba.</string>
     <string name="hub_name_chosen">%1$s · wybrany</string>
+    <string name="hub_switch_to">Przełącz teraz na %1$s</string>
+    <string name="hub_rename">Zmień nazwę</string>
+    <string name="hub_rename_label">Nazwa na tym telefonie</string>
+    <string name="hub_rename_hint">Widzi ją tylko ten telefon. Puste = nazwa nadana przez hub (%1$s).</string>
+    <string name="hub_own_name">Nazwa huba: %1$s</string>
+    <string name="save">Zapisz</string>
     <string name="hub_use_normal_info">Normalnie — hub używa tego telefonu na równi z pozostałymi łączami, kiedy tylko ma ruch.</string>
     <string name="hub_use_needed_info">Tylko gdy trzeba — telefon dołącza dopiero wtedy, gdy pozostałe łącza są w pełni zajęte (właściciel huba może też ustawić próg prędkości). Zwykle zużywa mniej danych.</string>
     <string name="hub_use_backup_info">Tylko jako zapas — telefon nie przesyła danych, dopóki działa jakiekolwiek inne łącze; przejmuje ruch dopiero, gdy wszystkie inne padną.</string>

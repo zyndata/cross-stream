@@ -1,6 +1,7 @@
 <script>
   import { onMount } from 'svelte'
   import { api, errorText } from '../lib/api.js'
+  import { t } from '../i18n/i18n.svelte.js'
 
   let { notify } = $props()
   let info = $state(null)
@@ -21,7 +22,7 @@
     busy = true
     try {
       fill(await api.setBypass(items.filter((s) => !isCIDR(s)), items.filter(isCIDR)))
-      notify('Lista omijania zapisana')
+      notify(t('bypass.saved'))
     } catch (e) {
       notify(errorText(e), true)
     } finally {
@@ -31,27 +32,25 @@
 </script>
 
 <div class="card">
-  <h2>Omijanie serwera</h2>
+  <h2>{t('bypass.title')}</h2>
   <p class="small">
-    Domeny (razem z subdomenami) i adresy IP z tej listy wychodzą bezpośrednio przez telefon, z jego adresu IP
-    operatora — np. bank, który blokuje adresy serwerów.
+    {t('bypass.hint')}
   </p>
   <div class="banner warn small">
-    Ten ruch nie idzie przez tunel: telefon i jego operator widzą, z czym się łączysz. Używaj tylko HTTPS. Działa
-    tylko dla urządzeń, które pytają o adresy DNS huba.
+    {t('bypass.warn')}
   </div>
   <form onsubmit={(e) => (e.preventDefault(), save())}>
     <label>
-      Jedna pozycja w wierszu: domena (bank.pl) albo adres / sieć IPv4 (203.0.113.0/24)
+      {t('bypass.label')}
       <textarea bind:value={text} rows="5" spellcheck="false" placeholder="bank.pl"></textarea>
     </label>
     {#if info && (info.domains?.length || info.cidrs?.length)}
       <p class="muted small">
-        Adresy z DNS: {info.learned} · telefony, które mogą przenieść ruch: {info.relays}
-        {#if info.relays === 0}<b> — brak, ruch idzie przez tunel</b>{/if}
+        {t('bypass.stats', { learned: info.learned, relays: info.relays })}
+        {#if info.relays === 0}<b> — {t('bypass.noRelays')}</b>{/if}
       </p>
     {/if}
-    <button class="primary" disabled={busy}>{busy ? 'Zapisuję…' : 'Zapisz'}</button>
+    <button class="primary" disabled={busy}>{busy ? t('diag.saving') : t('common.save')}</button>
   </form>
 </div>
 

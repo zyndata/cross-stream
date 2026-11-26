@@ -296,6 +296,17 @@ func SetDNS(ifc Iface, servers []netip.Addr) error {
 	return nil
 }
 
+// LUID returns the interface's LUID (ifc.LUID, else converted from its index).
+func LUID(ifc Iface) (uint64, error) {
+	luid := ifc.LUID
+	if luid == 0 {
+		if err := call(procIndexToLuid, uintptr(ifc.Index), uintptr(unsafe.Pointer(&luid))); err != nil {
+			return 0, fmt.Errorf("iphlp: luid of %v: %w", ifc, err)
+		}
+	}
+	return luid, nil
+}
+
 // DNS reads the interface's IPv4 DNS servers (test and diagnostics).
 func DNS(ifc Iface) ([]netip.Addr, error) {
 	var size uint32 = 15000

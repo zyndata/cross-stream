@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/zyndata/cross-stream/internal/bond"
+	"github.com/zyndata/cross-stream/internal/hub/netcfg"
 )
 
 // SettingsFile holds the hub-wide settings changed over IPC (GUI).
@@ -33,6 +34,9 @@ type Settings struct {
 	// PEPExclude: ports ("22"), port ranges ("5000-5100") and IPv4
 	// addresses or networks whose TCP flows stay in packet mode.
 	PEPExclude []string `json:"pep_exclude"`
+	// OwnTraffic: the hub laptop's own traffic goes through CrossStream too
+	// (phase 21; default off on Linux, always on on Windows).
+	OwnTraffic bool `json:"own_traffic"`
 }
 
 // DefaultSettings are the settings before anything was saved.
@@ -50,7 +54,11 @@ type SettingsParams struct {
 	PEP          *string `json:"pep,omitempty"`
 	// PEPExclude replaces the list when not nil.
 	PEPExclude *[]string `json:"pep_exclude,omitempty"`
+	OwnTraffic *bool     `json:"own_traffic,omitempty"`
 }
+
+// ErrOwnTrafficFixed is returned when own traffic would be turned off on a Windows hub.
+var ErrOwnTrafficFixed = errors.New("own_traffic off: not available on a Windows hub")
 
 // BondOpts are the session-wide bonding options of a Client.
 type BondOpts struct {
@@ -143,6 +151,7 @@ func saveSettings(dir string, s Settings) error {
 func (d *Daemon) Settings() Settings {
 	s := *d.settings.Load()
 	s.OverflowMbps = uint16(d.overflow.Load())
+	s.OwnTraffic = s.OwnTraffic || netcfg.OwnTrafficAlways
 	return s
 }
 
@@ -170,6 +179,12 @@ func (d *Daemon) SetSettings(p SettingsParams) (Settings, error) {
 	if p.PEPExclude != nil {
 		s.PEPExclude = append([]string{}, *p.PEPExclude...)
 	}
+	if p.OwnTraffic != nil {
+		if netcfg.OwnTrafficAlways && !*p.OwnTraffic {
+			return Settings{}, fmt.Errorf("settings.set: %w", ErrOwnTrafficFixed)
+		}
+		s.OwnTraffic = *p.OwnTraffic
+	}
 	o, err := s.bondOpts()
 	if err != nil {
 		return Settings{}, fmt.Errorf("settings.set: %w", err)
@@ -188,8 +203,10 @@ func (d *Daemon) SetSettings(p SettingsParams) (Settings, error) {
 		c.SetOverflow(s.OverflowMbps)
 		c.SetBondOpts(o)
 	}
+	d.setOwnTraffic(s.OwnTraffic)
 	d.log.Info("hub settings changed", "overflow_mbps", s.OverflowMbps, "redundancy", s.Redundancy,
-		"mode", s.Mode, "aggregation", s.Aggregation, "pep", s.PEP, "pep_exclude", len(s.PEPExclude))
+		"mode", s.Mode, "aggregation", s.Aggregation, "pep", s.PEP, "pep_exclude", len(s.PEPExclude),
+		"own_traffic", s.OwnTraffic)
 	return s, nil
 }
 
