@@ -19,7 +19,7 @@ func TestWriteSample(t *testing.T) {
 		TxRate: 2_500_000, RxRate: 125_000, Inflight: 200 * 1024, Cwnd: 400 * 1024, InflightHi: 300 * 1024,
 		AppLimited: true, Loss: 0.012, Lost: 15, Retransmit: 12}
 	st := hub.Status{
-		Bond: &hub.BondStatus{Queue: 7, Dropped: 9},
+		Bond: &hub.BondStatus{Queue: 7, Dropped: 9, Skipped: 30, Late: 12},
 		PEP:  &hub.PEPStatus{Backlog: 64 * 1024},
 		Relays: []hub.RelayStatus{
 			{Relay: pairing.Relay{Name: "S23, Ultra"}, Bond: &ps, Stats: &control.Stats{Dropped: 40}},
@@ -28,7 +28,7 @@ func TestWriteSample(t *testing.T) {
 	}
 	prevPS := ps
 	prevPS.Lost, prevPS.Retransmit = 10, 2
-	prev := pathSample{rows: []pathRow{{b: prevPS, dropped: 31}}, dropped: 4}
+	prev := pathSample{rows: []pathRow{{b: prevPS, dropped: 31}}, dropped: 4, skipped: 20, late: 10}
 
 	tests := []struct {
 		name string
@@ -36,9 +36,9 @@ func TestWriteSample(t *testing.T) {
 		want string
 	}{
 		{"first sample: counters since start", nil,
-			"2.0,3,S23  Ultra,alive,probe_bw,62,40,55,80,40.0,40.0,20.0,1.0,200,400,300,true,1.2,15,12,40,7,9,64\n"},
+			"2.0,3,S23  Ultra,alive,probe_bw,62,40,55,80,40.0,40.0,20.0,1.0,200,400,300,true,1.2,15,12,40,7,9,64,30,12\n"},
 		{"deltas since the previous sample", &prev,
-			"2.0,3,S23  Ultra,alive,probe_bw,62,40,55,80,40.0,40.0,20.0,1.0,200,400,300,true,1.2,5,10,9,7,5,64\n"},
+			"2.0,3,S23  Ultra,alive,probe_bw,62,40,55,80,40.0,40.0,20.0,1.0,200,400,300,true,1.2,5,10,9,7,5,64,10,2\n"},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

@@ -52,8 +52,9 @@ type member struct {
 	born time.Time
 }
 
-// connSet spreads one path over several TCP connections: packets go out
-// round-robin (a connection whose send queue is full is skipped); the
+// connSet spreads one path over several TCP connections: each packet goes
+// on the connection with the shortest send queue (ties round-robin; a
+// connection whose queue is full is skipped); the
 // server answers on the connection that brought the newest packet, so the
 // download moves between them too. No wire change. A loss on one connection
 // then stalls only the packets queued on it. A connection that fails is
@@ -259,7 +260,10 @@ func (s *connSet) TCPCounters() TCPCounters {
 	return out
 }
 
-// Send writes pkt on the next connection whose queue has room.
+// Send writes pkt on the connection with the shortest send queue (ties in
+// round-robin order), else on the next one whose queue has room. Plain
+// round-robin kept feeding a connection stalled on a TCP loss until its
+// queue was full.
 func (s *connSet) Send(pkt []byte) error {
 	live := *s.live.Load()
 	if len(live) == 0 {
@@ -271,13 +275,32 @@ func (s *connSet) Send(pkt []byte) error {
 		}
 	}
 	start := int(s.next.Add(1))
+	best := shortest(len(live), func(i int) int { return live[(start+i)%len(live)].Backlog() })
+	if live[(start+best)%len(live)].Send(pkt) == nil {
+		return nil
+	}
 	err := error(ErrQueueFull)
 	for i := range live {
+		if i == best {
+			continue
+		}
 		if err = live[(start+i)%len(live)].Send(pkt); err == nil {
 			return nil
 		}
 	}
 	return err
+}
+
+// shortest returns the index (0..n-1) with the smallest backlog(i); the first
+// such index on ties, so equal queues keep the caller's round-robin order.
+func shortest(n int, backlog func(i int) int) int {
+	best, bestBL := 0, -1
+	for i := range n {
+		if bl := backlog(i); bestBL < 0 || bl < bestBL {
+			best, bestBL = i, bl
+		}
+	}
+	return best
 }
 
 // Recv returns the next packet from any connection.

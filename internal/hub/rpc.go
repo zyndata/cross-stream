@@ -89,6 +89,7 @@ type BondStatus struct {
 	Dropped   uint64 `json:"dropped"`
 	Delivered uint64 `json:"delivered"`
 	Dups      uint64 `json:"dups"`
+	Late      uint64 `json:"late"` // arrived after their seq was skipped
 }
 
 // RelayStatus is one paired relay in Status.
@@ -301,7 +302,7 @@ func (d *Daemon) Status() Status {
 		st.TunnelMTU = rep.TunnelMTU
 		b := rep.Bond
 		st.Bond = &BondStatus{Queue: b.Queue, Reorder: b.Reorder, Skipped: b.Skipped, Dropped: b.Dropped,
-			Delivered: b.Delivered, Dups: b.Dups}
+			Delivered: b.Delivered, Dups: b.Dups, Late: b.Late}
 		st.Redundant = b.Redundant
 		for _, p := range b.Paths {
 			paths[p.ID] = p

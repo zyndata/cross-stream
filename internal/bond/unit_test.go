@@ -1,6 +1,7 @@
 package bond
 
 import (
+	"cmp"
 	"slices"
 	"testing"
 	"time"
@@ -67,21 +68,22 @@ func TestReceiverReorder(t *testing.T) {
 		want    []uint32
 		skipped uint64
 		dups    uint64
+		late    uint64
 	}{
-		{"in order", time.Second, []step{{0, 10, false}, {0, 11, false}, {0, 12, false}}, []uint32{10, 11, 12}, 0, 0},
-		{"reordered", time.Second, []step{{0, 10, false}, {0, 12, false}, {0, 11, false}}, []uint32{10, 11, 12}, 0, 0},
-		{"duplicate", time.Second, []step{{0, 10, false}, {0, 10, false}, {0, 11, false}}, []uint32{10, 11}, 0, 1},
+		{"in order", time.Second, []step{{0, 10, false}, {0, 11, false}, {0, 12, false}}, []uint32{10, 11, 12}, 0, 0, 0},
+		{"reordered", time.Second, []step{{0, 10, false}, {0, 12, false}, {0, 11, false}}, []uint32{10, 11, 12}, 0, 0, 0},
+		{"duplicate", time.Second, []step{{0, 10, false}, {0, 10, false}, {0, 11, false}}, []uint32{10, 11}, 0, 1, 0},
 		{"gap skipped after hold", 50 * time.Millisecond,
 			[]step{{0, 10, false}, {0, 12, false}, {40 * time.Millisecond, 0, true}, {60 * time.Millisecond, 0, true}},
-			[]uint32{10, 12}, 1, 0},
+			[]uint32{10, 12}, 1, 0, 0},
 		{"late after skip dropped", 50 * time.Millisecond,
 			[]step{{0, 10, false}, {0, 12, false}, {60 * time.Millisecond, 0, true}, {70 * time.Millisecond, 11, false}},
-			[]uint32{10, 12}, 1, 1},
+			[]uint32{10, 12}, 1, 0, 1},
 		{"later gaps share one hold", 50 * time.Millisecond, // 11 and 13 lost: one hold, not two
 			[]step{{0, 10, false}, {0, 12, false}, {5 * time.Millisecond, 14, false}, {60 * time.Millisecond, 0, true}},
-			[]uint32{10, 12, 14}, 2, 0},
+			[]uint32{10, 12, 14}, 2, 0, 0},
 		{"peer restart resets", time.Second, []step{{0, 100000, false}, {0, 5, false}, {0, 6, false}},
-			[]uint32{100000, 5, 6}, 0, 0},
+			[]uint32{100000, 5, 6}, 0, 0, 0},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -96,8 +98,8 @@ func TestReceiverReorder(t *testing.T) {
 				}
 				r.onIP(now, s.seq, []byte{byte(s.seq >> 24), byte(s.seq >> 16), byte(s.seq >> 8), byte(s.seq)}, deliver)
 			}
-			if !slices.Equal(got, tt.want) || r.skipped != tt.skipped || r.dups != tt.dups {
-				t.Errorf("delivered %v skipped %d dups %d, want %v %d %d", got, r.skipped, r.dups, tt.want, tt.skipped, tt.dups)
+			if !slices.Equal(got, tt.want) || r.skipped != tt.skipped || r.dups != tt.dups || r.late != tt.late {
+				t.Errorf("delivered %v skipped %d dups %d late %d, want %v %d %d %d", got, r.skipped, r.dups, r.late, tt.want, tt.skipped, tt.dups, tt.late)
 			}
 		})
 	}
@@ -347,19 +349,21 @@ func TestStartupExit(t *testing.T) {
 		step     time.Duration // time between rounds
 		wantDone bool          // left STARTUP
 		wantHi   bool          // inflight_hi set
+		perRound uint64        // bytes delivered per round (0: 20 kB)
 	}{
-		{"heavy loss", startupLossEvents, false, true, rtt, true, true},
-		{"few losses", startupLossEvents - 1, false, true, rtt, false, false},
-		{"app-limited, early", 0, true, false, rtt, false, false},
-		{"app-limited, past the bound", 0, true, false, startupAppBound / 4, true, false},
-		{"full pipe", 0, false, false, rtt, true, false},
+		{"heavy loss", startupLossEvents, false, true, rtt, true, true, 0},
+		{"heavy loss, almost nothing delivered", startupLossEvents, false, true, rtt, false, false, initialCwnd / 2},
+		{"few losses", startupLossEvents - 1, false, true, rtt, false, false, 0},
+		{"app-limited, early", 0, true, false, rtt, false, false, 0},
+		{"app-limited, past the bound", 0, true, false, startupAppBound / 4, true, false, 0},
+		{"full pipe", 0, false, false, rtt, true, false, 0},
 	}
 	for _, tt := range tests {
 		var b bbr
 		now, delivered, rate := t0, uint64(0), 200_000.0
 		for range 8 {
 			prev := delivered
-			delivered += 10_000
+			delivered += cmp.Or(tt.perRound, 20_000)
 			for range tt.losses {
 				b.onLoss(now, 1500, prev, rtt, time.Hour)
 			}

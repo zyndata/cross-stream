@@ -173,6 +173,7 @@ type Stats struct {
 	Dropped    uint64      `json:"dropped"`   // packets dropped from the send queue
 	Delivered  uint64      `json:"delivered"` // packets delivered in order
 	Dups       uint64      `json:"dups"`      // duplicate packets received
+	Late       uint64      `json:"late"`      // first copies received after their seq was skipped
 	TunnelMTU  int         `json:"tunnel_mtu"`
 	Mode       string      `json:"mode"`       // max_throughput / min_latency
 	Redundancy string      `json:"redundancy"` // off / auto / on (setting)

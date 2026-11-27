@@ -105,6 +105,7 @@ type BondCounters struct {
 	Dropped   uint64 `json:"dropped"`
 	Delivered uint64 `json:"delivered"`
 	Dups      uint64 `json:"dups"`
+	Late      uint64 `json:"late"` // arrived after their seq was skipped
 	// Mode and Redundancy come from the hub's SESSION_CONFIG.
 	Mode       string `json:"mode"`
 	Redundancy string `json:"redundancy"`

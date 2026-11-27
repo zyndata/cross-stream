@@ -87,3 +87,49 @@ func TestStreamListCapped(t *testing.T) {
 		t.Fatalf("%d connections kept, want %d", n, maxStreams)
 	}
 }
+
+// queuedStream is a stream sender that reports a send queue of bl packets.
+type queuedStream struct {
+	streamRecorder
+	bl int
+}
+
+func (q *queuedStream) Backlog() int { return q.bl }
+
+// TestStreamSendBacklog: the newest connection keeps the path's packets
+// until its queue reaches streamSwitchBacklog and another live connection
+// has at most half as many waiting (a TCP loss stalls the newest one).
+func TestStreamSendBacklog(t *testing.T) {
+	a1 := netip.MustParseAddrPort("192.0.2.9:40000")
+	a2 := netip.MustParseAddrPort("192.0.2.9:40001")
+	tests := []struct {
+		name       string
+		bl1, blNew int
+		want       [2]int // packets on the older, the newest of 4
+	}{
+		{"both short", 0, 0, [2]int{0, 4}},
+		{"newest below the switch mark", 0, streamSwitchBacklog - 1, [2]int{0, 4}},
+		{"newest stalled, the other short", 3, streamSwitchBacklog, [2]int{4, 0}},
+		{"newest stalled, the other not much shorter", streamSwitchBacklog/2 + 1, streamSwitchBacklog, [2]int{0, 4}},
+		{"exactly half", streamSwitchBacklog / 2, streamSwitchBacklog, [2]int{4, 0}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			p := newPair(t)
+			keysFromPair(t, p)
+			c1, c2 := &queuedStream{bl: tc.bl1}, &queuedStream{bl: tc.blNew}
+			p.srv.mu.Lock()
+			p.srv.setPathLocked(2, a1, c1)
+			p.srv.setPathLocked(2, a2, c2) // newest
+			p.srv.mu.Unlock()
+			for range 4 {
+				if err := p.srv.SendOn(2, &wire.Ping{}); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if got := [2]int{c1.count(), c2.count()}; got != tc.want {
+				t.Fatalf("packets per connection %v, want %v", got, tc.want)
+			}
+		})
+	}
+}

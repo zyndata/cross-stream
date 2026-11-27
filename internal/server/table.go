@@ -242,7 +242,7 @@ func (s *Server) Sessions(context.Context) ([]admin.Session, error) {
 			as.Paths = append(as.Paths, admin.Path{ID: p.ID, Name: hs.names[p.ID], Addr: addrs[p.ID], Stats: p})
 		}
 		as.Bond = admin.BondCounters{Queue: st.Bond.Queue, Reorder: st.Bond.Reorder, Skipped: st.Bond.Skipped,
-			Dropped: st.Bond.Dropped, Delivered: st.Bond.Delivered, Dups: st.Bond.Dups,
+			Dropped: st.Bond.Dropped, Delivered: st.Bond.Delivered, Dups: st.Bond.Dups, Late: st.Bond.Late,
 			Mode: st.Bond.Mode, Redundancy: st.Bond.Redundancy, Redundant: st.Bond.Redundant}
 		out = append(out, as)
 	}

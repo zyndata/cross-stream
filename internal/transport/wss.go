@@ -39,6 +39,9 @@ func newWSConn(ws *websocket.Conn) *wsConn {
 
 func (c *wsConn) Send(pkt []byte) error { return c.w.send(pkt) }
 
+// Backlog implements Backlogger.
+func (c *wsConn) Backlog() int { return c.w.backlog() }
+
 // setReadDeadline bounds the following Recv calls (zero = no bound).
 func (c *wsConn) setReadDeadline(t time.Time) error {
 	c.deadline.Store(t.UnixNano())

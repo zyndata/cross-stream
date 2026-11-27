@@ -10,7 +10,7 @@ self-hosted, end-to-end encrypted, shared as a Wi-Fi hotspot.**
 ![Platforms](https://img.shields.io/badge/hub-Linux%20%7C%20Windows-informational)
 ![Relay](https://img.shields.io/badge/relay-Android%2010%2B-green)
 
-> **Status:** beta — latest release `v0.11.1`. The field test (real carriers, a day
+> **Status:** beta — latest release `v0.11.2`. The field test (real carriers, a day
 > away from home) is still in progress; `v1.0.0` follows it. Everything below works and is
 > tested in the Docker test environment, and most of it on real phones and laptops —
 > see [Status and limitations](#status-and-limitations) for what is not yet tried on hardware.
@@ -487,6 +487,20 @@ Layout: [docs/repo-structure.md](docs/repo-structure.md). Test environment:
 ## Changelog
 
 Highlights of each release, newest first. Every change: [CHANGELOG.md](CHANGELOG.md).
+
+### v0.11.2 — 2026-11-27
+
+- Faster start: a link that just joined (a phone connecting, the hub restarting) reaches its
+  speed in about a second instead of crawling up for several seconds, also when a cold LTE
+  uplink loses its first packets.
+- A link that fell back to TCP because UDP failed tries UDP again after 10 minutes (then less
+  often) instead of staying on TCP for the whole session.
+- Links over TCP with several connections no longer stall on packet loss: in the test
+  environment at 2 % loss the slowest download rose from under 2 to about 12 Mb/s.
+- Diagnostics: packets that arrive after the reorder buffer gave up on them are counted
+  (`xs-ctl sessions` column `QUEUE/DROP/SKIP/LATE`, `xs-hubctl paths` columns `skipped`, `late`).
+- **Upgrade:** no special order (protocol unchanged). Update the server too (Home Assistant:
+  *Update*) for the TCP-link fixes.
 
 ### v0.11.1 — 2026-11-26
 

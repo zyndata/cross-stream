@@ -20,7 +20,10 @@ import (
 const MaxPacket = 0xFFFF
 
 // SendQueue is how many packets a stream connection buffers before it drops
-// (a stalled TCP connection must not block the bond engine).
+// (a stalled TCP connection must not block the bond engine). Senders pick
+// the connection with the shorter queue (Backlogger), so a stalled one's
+// queue stops growing long before it is full; 256 measured no better in
+// e2e tcploss and cost one connection ~1 Mb/s at 0 % loss (2026-11-27).
 const SendQueue = 1024
 
 // Errors.
@@ -39,6 +42,11 @@ type Conn interface {
 	Close() error
 	Transport() wire.Transport
 }
+
+// Backlogger is a stream connection that reports how many packets wait in
+// its send queue (a stalled TCP connection's grows; senders prefer a shorter
+// one, 2026-11-27).
+type Backlogger interface{ Backlog() int }
 
 // Lookup resolves a host name to IPv4 addresses.
 type Lookup func(ctx context.Context, network, host string) ([]netip.Addr, error)

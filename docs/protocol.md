@@ -136,7 +136,9 @@ QR is regenerated every 10 min and after each successful pairing.
 Endpoint choice: the hub orders the code's `ep` by transport (UDP, TCP, WSS; code order
 within one); a path starts on the first; if it does not work for 5 s while another path is
 ALIVE (15 s while none is and it is the only relay), the hub sends `endpoint` with the next one (then wrap). A relay
-that reconnects starts on the endpoint its path last worked on.
+that reconnects starts on the endpoint its path last worked on. A path working on a later endpoint (TCP/WSS) tries
+the first one again after 10 min while another path is ALIVE; it stays there once it worked for 15 s, else it goes
+back to the endpoint that worked after 5 s and the next try waits twice as long (at most 2 h).
 TCP/WSS framing between relay and server: `len u16 | outer packet` (WSS: one packet per
 binary message).
 | mode | H→R | `mode: bonded/direct`, `proxy: bool` (true in DIRECT or when the bypass list is non-empty), `proxy_token` (32 B b64, when proxy) |
@@ -144,8 +146,9 @@ binary message).
 | forget | H→R | relay must delete this hub |
 
 A `tcp://` path may use several TCP connections to the same endpoint (phase 20, no wire
-change): each carries the same framing, packets go out round-robin, the server answers on
-the connection of the newest packet from that path (a new source port from the same IP on a
+change): each carries the same framing, each packet goes on the connection with the shortest
+send queue (ties round-robin), the server answers on the connection of the newest packet from
+that path unless 32 packets wait there and another one has at most half (a new source port from the same IP on a
 stream path is not an address change: no PATH_INFO), a failed connection is redialed while
 the others carry the path. The hub picks the number: 2, 4 while the TCP retransmission ratio
 over 10 s is ≥ 3 % (back to 2 after 30 s under 1 %).

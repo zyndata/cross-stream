@@ -121,6 +121,10 @@ type receiver struct {
 	passRealtime bool // min_latency: UDP/ICMP packets are not held behind gaps
 
 	delivered, skipped, dups uint64
+	// late: first copies that came after the hold gave up on their seq
+	// (counted in skipped before). Many late arrivals mean the hold is too
+	// short for a path (e.g. a stalled TCP connection), not lost packets.
+	late uint64
 }
 
 func (r *receiver) reset(seq uint32) {
@@ -157,10 +161,10 @@ func (r *receiver) onIP(now time.Time, seq uint32, pkt []byte, deliver func([]by
 	d := seqDiff(seq, r.next)
 	switch {
 	case d < 0: // already skipped
+		r.late++
 		if rel {
 			return true
 		}
-		r.dups++
 	case d == 0:
 		r.delivered++
 		if !rel {

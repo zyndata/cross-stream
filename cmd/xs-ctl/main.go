@@ -197,7 +197,7 @@ func printForwards(w io.Writer, hubs []admin.Hub) {
 
 func printSessions(w io.Writer, ss []admin.Session, now time.Time) {
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-	_, _ = fmt.Fprintln(tw, "HUB\tTUNNEL IP\tPATHS\tRX\tTX\tRATE RX/TX\tQUEUE/DROP/SKIP\tLAST SEEN")
+	_, _ = fmt.Fprintln(tw, "HUB\tTUNNEL IP\tPATHS\tRX\tTX\tRATE RX/TX\tQUEUE/DROP/SKIP/LATE\tLAST SEEN")
 	for _, s := range ss {
 		paths := make([]string, 0, len(s.Paths))
 		for _, p := range s.Paths {
@@ -207,9 +207,9 @@ func printSessions(w io.Writer, ss []admin.Session, now time.Time) {
 		if !s.LastSeen.IsZero() {
 			seen = now.Sub(s.LastSeen).Round(time.Second).String() + " ago"
 		}
-		_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s/s / %s/s\t%d/%d/%d\t%s\n", s.Hub, s.TunnelIP, strings.Join(paths, ","),
+		_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s/s / %s/s\t%d/%d/%d/%d\t%s\n", s.Hub, s.TunnelIP, strings.Join(paths, ","),
 			bytes(float64(s.RxBytes)), bytes(float64(s.TxBytes)), bytes(s.RxRate), bytes(s.TxRate),
-			s.Bond.Queue, s.Bond.Dropped, s.Bond.Skipped, seen)
+			s.Bond.Queue, s.Bond.Dropped, s.Bond.Skipped, s.Bond.Late, seen)
 	}
 	_ = tw.Flush()
 	printPaths(w, ss)

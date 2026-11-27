@@ -29,6 +29,8 @@ type pathSample struct {
 	queue   int
 	dropped uint64 // bond send-queue drops
 	backlog int    // PEP bytes from local apps not sent yet
+	skipped uint64 // seqs the reorder buffer gave up on (download direction)
+	late    uint64 // of those, arrived later after all
 }
 
 // sampleOf picks the bonded paths (relays and local uplinks) out of a status.
@@ -50,7 +52,7 @@ func sampleOf(at time.Time, st hub.Status) pathSample {
 		}
 	}
 	if st.Bond != nil {
-		s.queue, s.dropped = st.Bond.Queue, st.Bond.Dropped
+		s.queue, s.dropped, s.skipped, s.late = st.Bond.Queue, st.Bond.Dropped, st.Bond.Skipped, st.Bond.Late
 	}
 	if st.PEP != nil {
 		s.backlog = st.PEP.Backlog
@@ -60,18 +62,18 @@ func sampleOf(at time.Time, st hub.Status) pathSample {
 
 const pathsHeader = "t_s,path,name,state,cc,srtt_ms,min_rtt_ms,bdp_rtt_ms,data_rtt_ms,btlbw_mbps,pacing_mbps," +
 	"tx_mbps,rx_mbps,inflight_kb,cwnd_kb,inflight_hi_kb,app_limited,loss_pct,lost,retrans,relay_dropped," +
-	"queue,queue_dropped,pep_backlog_kb"
+	"queue,queue_dropped,pep_backlog_kb,skipped,late"
 
 // writeSample prints one CSV line per path of cur; counters (lost, retrans,
 // drops) are the change since prev (nil: since the path started).
 func writeSample(w io.Writer, start time.Time, prev *pathSample, cur pathSample) error {
 	old := map[uint8]pathRow{}
-	var oldDropped uint64
+	var o0 pathSample
 	if prev != nil {
 		for _, r := range prev.rows {
 			old[r.b.ID] = r
 		}
-		oldDropped = prev.dropped
+		o0 = *prev
 	}
 	mbps := func(bytesPerSec uint64) string { return fmt.Sprintf("%.1f", float64(bytesPerSec)*8/1e6) }
 	ms := func(d time.Duration) string { return fmt.Sprintf("%.0f", float64(d)/float64(time.Millisecond)) }
@@ -79,13 +81,13 @@ func writeSample(w io.Writer, start time.Time, prev *pathSample, cur pathSample)
 	for _, r := range cur.rows {
 		o := old[r.b.ID]
 		name := strings.ReplaceAll(r.name, ",", " ")
-		_, err := fmt.Fprintf(w, "%.1f,%d,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%t,%.1f,%d,%d,%d,%d,%d,%s\n",
+		_, err := fmt.Fprintf(w, "%.1f,%d,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%t,%.1f,%d,%d,%d,%d,%d,%s,%d,%d\n",
 			cur.at.Sub(start).Seconds(), r.b.ID, name, r.b.State, r.b.CC,
 			ms(r.b.SRTT), ms(r.b.MinRTT), ms(r.b.BDPRTT), ms(r.b.DataRTT),
 			mbps(r.b.BtlBw), mbps(r.b.Pacing), mbps(r.b.TxRate), mbps(r.b.RxRate),
 			kb(r.b.Inflight), kb(r.b.Cwnd), kb(r.b.InflightHi), r.b.AppLimited, 100*r.b.Loss,
 			delta(r.b.Lost, o.b.Lost), delta(r.b.Retransmit, o.b.Retransmit), delta(r.dropped, o.dropped),
-			cur.queue, delta(cur.dropped, oldDropped), kb(cur.backlog))
+			cur.queue, delta(cur.dropped, o0.dropped), kb(cur.backlog), delta(cur.skipped, o0.skipped), delta(cur.late, o0.late))
 		if err != nil {
 			return err
 		}

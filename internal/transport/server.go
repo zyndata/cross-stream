@@ -36,6 +36,14 @@ func (s *ServerConn) WriteToUDPAddrPort(b []byte, _ netip.AddrPort) (int, error)
 	return len(b), nil
 }
 
+// Backlog implements Backlogger (0 when the connection does not report it).
+func (s *ServerConn) Backlog() int {
+	if b, ok := s.c.(Backlogger); ok {
+		return b.Backlog()
+	}
+	return 0
+}
+
 // Stream reports true: the bond engine treats this path as reliable.
 func (s *ServerConn) Stream() bool { return true }
 

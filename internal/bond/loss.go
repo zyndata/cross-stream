@@ -102,6 +102,10 @@ func (e *Engine) sample(now time.Time, p *path, sp *sentPacket, minRTT time.Dura
 	if interval >= minRTT/2 && interval > 0 {
 		rate = float64(p.delivered-sp.delivered) / interval.Seconds()
 	}
+	// TCP/WSS paths never restart STARTUP: TCP has its own congestion
+	// control, and a 2.89× pacing burst into its send queue spills onto the
+	// path's other connections like extra_acked did.
+	p.cc.stream = p.stream
 	p.cc.onAck(now, rate, sp.appLimited, sp.delivered, p.delivered, p.inflight, minRTT)
 	if !p.stream {
 		// Not on TCP/WSS paths: a loss stalls the TCP connection and its ACKs

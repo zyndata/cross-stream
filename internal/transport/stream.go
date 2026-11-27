@@ -57,6 +57,9 @@ func (w *writer) send(pkt []byte) error {
 	}
 }
 
+// backlog is how many packets wait in the queue.
+func (w *writer) backlog() int { return len(w.q) }
+
 func (w *writer) stop(err error) {
 	w.once.Do(func() {
 		w.err = err
@@ -82,6 +85,9 @@ func newTCPConn(c net.Conn) *tcpConn {
 }
 
 func (t *tcpConn) Send(pkt []byte) error { return t.w.send(pkt) }
+
+// Backlog implements Backlogger.
+func (t *tcpConn) Backlog() int { return t.w.backlog() }
 
 // Recv reads one framed packet; a packet larger than buf is an error.
 func (t *tcpConn) Recv(buf []byte) (int, error) {

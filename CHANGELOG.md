@@ -3,6 +3,26 @@
 All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [0.11.2] - 2026-11-27
+
+### Added
+
+- **bond:** Count late arrivals after a reorder skip
+
+### Changed
+
+- **bond:** Stream flag for TCP/WSS paths in BBR-lite; RTT-rise restart tried and dropped
+
+### Fixed
+
+- **bond:** STARTUP again for a path whose rate was never measured
+- **bond:** No STARTUP restart on TCP/WSS paths
+- **hub:** A path on a TCP/WSS fallback tries UDP again
+- **transport:** TCP_NOTSENT_LOWAT and a shorter send queue on stream links
+- **bond:** A lossy first round ends STARTUP only after a real delivery
+- **transport:** Stream connections chosen by send queue
+- **transport:** Stream send queue back to 1024; tcploss compares within a run
+
 ## [0.11.1] - 2026-11-26
 
 ### Fixed

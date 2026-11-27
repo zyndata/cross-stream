@@ -90,30 +90,11 @@ type bbr struct {
 	extraAcked    roundMax
 	ackEpochAt    time.Time
 	ackEpochAcked uint64
-}
 
-const (
-	ackEpochReset  = 1 << 20                // bytes: a long epoch starts over (Linux bbr_ack_epoch_acked_reset_thresh)
-	extraAckedTime = 100 * time.Millisecond // extra_acked is at most this long at btlbw (Linux bbr_extra_acked_max_us)
-)
-
-// onAcked updates the ACK aggregation estimate for acked bytes; cwnd is
-// the path's current in-flight cap.
-func (b *bbr) onAcked(now time.Time, acked, cwnd int) {
-	bw := b.bw()
-	if bw == 0 || acked <= 0 {
-		return
-	}
-	if b.ackEpochAt.IsZero() {
-		b.ackEpochAt = now
-	}
-	expected := uint64(float64(bw) * now.Sub(b.ackEpochAt).Seconds())
-	if b.ackEpochAcked <= expected || b.ackEpochAcked+uint64(acked) >= ackEpochReset {
-		b.ackEpochAcked, b.ackEpochAt, expected = 0, now, 0
-	}
-	b.ackEpochAcked += uint64(acked)
-	extra := min(b.ackEpochAcked-expected, uint64(cwnd), uint64(float64(bw)*extraAckedTime.Seconds()))
-	b.extraAcked.add(b.round, extra)
+	bwProven    bool      // STARTUP saw a busy path or ended on loss: its rate was measured (maybeRestartStartup)
+	stream      bool      // TCP/WSS path: never restarts STARTUP (its TCP has its own congestion control)
+	startupBusy int       // samples in this STARTUP that were not app-limited
+	restartAt   time.Time // last maybeRestartStartup restart
 }
 
 // onRTT feeds a path RTT sample (from PING/PONG). The min RTT filter expires
@@ -325,9 +306,13 @@ func (b *bbr) onRoundEnd(delivered uint64, minRTT time.Duration) bool {
 	got := delivered - b.roundStart
 	lossy := b.roundLost > 0 && float64(b.roundLost) > lossThresh*float64(got+b.roundLost)
 	switch {
-	case lossy && b.mode == bbrStartup && b.roundLossEvents >= startupLossEvents:
+	case lossy && b.mode == bbrStartup && b.roundLossEvents >= startupLossEvents && got >= initialCwnd:
+		// A round that delivered less than the initial window measured
+		// nothing: a cold LTE uplink lost the first burst of a fresh S23
+		// path (2026-11-27), the exit left a 0.2 Mb/s estimate and a 6 KB
+		// bound, and the path crawled for 10 s.
 		b.inflightHi = max(int(b.bdp(minRTT)), int(got), minCwnd)
-		b.mode = bbrDrain
+		b.mode, b.bwProven = bbrDrain, true
 	case lossy && b.mode != bbrStartup && b.roundLossEvents >= probeLossEvents:
 		hi := b.inflightHi
 		if hi == 0 {
@@ -367,13 +352,17 @@ func (b *bbr) onAck(now time.Time, rate float64, appLimited bool, pktDelivered, 
 		// its floor). Lossy rounds and paths whose rate fell still age it.
 		b.maxBW.add(b.round, bw)
 	}
+	b.maybeRestartStartup(now, appLimited, inflight, minRTT)
 	switch b.mode {
 	case bbrStartup:
+		if !appLimited {
+			b.startupBusy++
+		}
 		if roundEnd && (!appLimited || now.Sub(b.startupAt) >= startupAppBound) {
 			if bw := b.bw(); float64(bw) >= float64(b.fullBW)*fullBWGrowth {
 				b.fullBW, b.fullCnt = bw, 0
 			} else if b.fullCnt++; b.fullCnt >= fullBWRounds {
-				b.mode = bbrDrain
+				b.mode, b.bwProven = bbrDrain, b.startupBusy >= startupBusyMin
 			}
 		}
 		if b.mode != bbrDrain {

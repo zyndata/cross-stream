@@ -341,7 +341,7 @@ func (e *Engine) Stats() Stats {
 	defer e.mu.Unlock()
 	now := e.cfg.Now()
 	st := Stats{Queue: len(e.queue) + len(e.rtq) + len(e.rtx) + len(e.relq), Reliable: e.relBytes, Reorder: len(e.recv.buf), Skipped: e.recv.skipped,
-		Dropped: e.dropped, Delivered: e.recv.delivered, Dups: e.recv.dups, TunnelMTU: e.tunnelMTU(),
+		Dropped: e.dropped, Delivered: e.recv.delivered, Dups: e.recv.dups, Late: e.recv.late, TunnelMTU: e.tunnelMTU(),
 		Mode: e.mode.String(), Redundancy: e.redundancy.String(), Redundant: e.redundant(now), Aggregate: !e.noAggregate}
 	for _, p := range e.order {
 		st.Paths = append(st.Paths, p.stats(now))

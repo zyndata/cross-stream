@@ -59,19 +59,50 @@ func (p *Path) freshStreamsLocked(now time.Time, out []Sender) []Sender {
 	return out
 }
 
+// streamSwitchBacklog is how many packets may wait on the newest
+// connection before a path's write prefers one with at most half as many
+// (about 40 ms at 8 Mb/s: past the jitter of a healthy connection, well
+// before a stalled one's packets outlive the receiver's reorder hold).
+const streamSwitchBacklog = 32
+
+// backlogger is a stream sender that reports its send queue length
+// (transport.Backlogger).
+type backlogger interface{ Backlog() int }
+
+func backlog(c Sender) int {
+	if b, ok := c.(backlogger); ok {
+		return b.Backlog()
+	}
+	return 0
+}
+
 // write sends buf on p.Conn (the connection of the newest packet: bursts
-// stay in order on one TCP connection); when that fails on a stream path
-// (queue full while TCP recovers a loss, or closed) it tries the path's
-// other live connections, round-robin.
+// stay in order on one TCP connection) unless that one has a queue of
+// streamSwitchBacklog and another live connection at most half of it (a TCP
+// loss stalls the newest one); when the send fails (queue full while TCP
+// recovers a loss, or closed) it tries the path's other live connections,
+// round-robin.
 func (s *Session) write(p Path, conns []Sender, buf []byte) error {
-	_, err := p.Conn.WriteToUDPAddrPort(buf, p.Addr)
+	first := p.Conn
+	if bl := backlog(first); bl >= streamSwitchBacklog && len(conns) > 1 {
+		best, bestBL := first, bl
+		for _, c := range conns {
+			if b := backlog(c); b < bestBL {
+				best, bestBL = c, b
+			}
+		}
+		if 2*bestBL <= bl {
+			first = best
+		}
+	}
+	_, err := first.WriteToUDPAddrPort(buf, p.Addr)
 	if err == nil || len(conns) == 0 {
 		return err
 	}
 	start := int(s.rr.Add(1) % uint32(len(conns)))
 	for i := range conns {
 		c := conns[(start+i)%len(conns)]
-		if c == p.Conn {
+		if c == first {
 			continue
 		}
 		if _, err = c.WriteToUDPAddrPort(buf, p.Addr); err == nil {

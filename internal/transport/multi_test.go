@@ -207,3 +207,22 @@ func TestStreamConnsCounters(t *testing.T) {
 		t.Fatalf("counters went back: %+v → %+v", got, after)
 	}
 }
+
+func TestShortestBacklog(t *testing.T) {
+	tests := []struct {
+		name string
+		bl   []int
+		want int
+	}{
+		{"one", []int{5}, 0},
+		{"all empty: the first (round-robin order)", []int{0, 0, 0}, 0},
+		{"stalled first", []int{40, 0, 2}, 1},
+		{"tie after the first", []int{9, 3, 3}, 1},
+		{"last shortest", []int{7, 6, 1}, 2},
+	}
+	for _, tc := range tests {
+		if got := shortest(len(tc.bl), func(i int) int { return tc.bl[i] }); got != tc.want {
+			t.Errorf("%s: shortest %d, want %d", tc.name, got, tc.want)
+		}
+	}
+}
